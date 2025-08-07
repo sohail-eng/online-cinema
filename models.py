@@ -67,3 +67,14 @@ class ActivationToken(Base):
     expires_at = Column(DateTime)
 
     user = relationship("User", back_populates="activation_token")
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    token = Column(String(300), unique=True)
+    expires_at = Column(DateTime)
+
+    user = relationship("User", back_populates="refresh_token")
