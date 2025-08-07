@@ -1,7 +1,7 @@
 from datetime import timedelta, timezone, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from fastapi.params import Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +19,7 @@ router = APIRouter()
 DpGetDB = Annotated[AsyncSession, Depends(get_db)]
 
 @router.post("login/", response_model=schemas.LoginTokens)
-async def login_endpoint(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: DpGetDB):
+async def login_endpoint(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: DpGetDB, response: Response):
     email = form_data.username
     password = form_data.password
     user = await get_user_by_email(email, db)
@@ -46,7 +46,15 @@ async def login_endpoint(form_data: Annotated[OAuth2PasswordRequestForm, Depends
     db.add(refresh_token_obj)
     await db.commit()
 
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        samesite="lax",
+        secure=True,
+        expires=refresh_token_obj.expires_at
+    )
+
     return schemas.LoginTokens(
         access_token=access_token,
-        refresh_token=refresh_token
     )

@@ -8,5 +8,4 @@ class TokenPayload(BaseModel):
 
 class LoginTokens(BaseModel):
     access_token: str
-    refresh_token: str
     header: Optional[str] = "bearer"
