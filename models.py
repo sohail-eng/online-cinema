@@ -13,3 +13,13 @@ class UserGroupEnum(str, Enum):
 class GenderEnum(str, Enum):
     man = "MAN"
     woman = "WOMAN"
+
+
+class UserGroup(BaseModel):
+    __tablename__ = "user_groups"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(SqlEnum(UserGroupEnum), unique=True, nullable=False)
+
+    users = relationship("User", back_populates="user_group")
+
