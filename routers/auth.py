@@ -58,3 +58,11 @@ async def login_endpoint(form_data: Annotated[OAuth2PasswordRequestForm, Depends
     return schemas.LoginTokens(
         access_token=access_token,
     )
+
+
+async def validate_refresh_token(refresh_token: Annotated[str | None, Cookie()], db: DpGetDB):
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Refresh Token")
+    user = security.get_current_user(refresh_token, db)
+    return user
+
