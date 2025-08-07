@@ -56,3 +56,14 @@ class UserProfile(Base):
     info = Column(String(200), nullable=True)
 
     user = relationship("User", back_populates="user_profile")
+
+
+class ActivationToken(Base):
+    __tablename__ = "activation_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    token = Column(String(100), unique=True)
+    expires_at = Column(DateTime)
+
+    user = relationship("User", back_populates="activation_token")
