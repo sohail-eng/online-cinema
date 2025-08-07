@@ -96,3 +96,16 @@ async def validate_refresh_token(refresh_token: Annotated[str | None, Cookie()],
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User from refresh token not exist")
     return user
 
+
+@router.post("token/refresh/")
+async def refresh_token_endpoint(user: Depends(validate_refresh_token)) -> AccessToken:
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Something went wrong. Try again.")
+
+    data = {
+        "type": "access",
+        "sub": user.email,
+        "role": user.user_group
+    }
+    new_access_token = create_token(data=data, expiration=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    return schemas.AccessToken(access_token=new_access_token)
