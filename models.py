@@ -152,7 +152,7 @@ class Movie(Base):
     __tablename__ = "movies"
 
     __table_args__ = (
-        UniqueConstraint("name", "year", "time")
+        UniqueConstraint("name", "year", "time"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
