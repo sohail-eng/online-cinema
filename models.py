@@ -1,6 +1,6 @@
 from enum import Enum
 
-from sqlalchemy import Column, Integer, ForeignKey, String, Enum as SqlEnum, Boolean, DateTime, func, text, Date
+from sqlalchemy import Column, Integer, ForeignKey, String, Enum as SqlEnum, Boolean, DateTime, func, Date
 from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
@@ -67,6 +67,17 @@ class ActivationToken(Base):
     expires_at = Column(DateTime)
 
     user = relationship("User", back_populates="activation_token")
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    token = Column(String(300), unique=True)
+    expires_at = Column(DateTime)
+
+    user = relationship("User", back_populates="password_reset_token")
 
 
 class RefreshToken(Base):
