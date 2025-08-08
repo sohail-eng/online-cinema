@@ -176,3 +176,7 @@ async def activate_account(db: DpGetDB, token: str):
 
     return JSONResponse(content={"detail": "You account was successfully activated!"}, status_code=status.HTTP_200_OK)
 
+
+@router.post("send_new_activation_token/")
+async def rend_new_activation_token(db: DpGetDB):
+    pass
