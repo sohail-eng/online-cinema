@@ -35,5 +35,17 @@ class UserCreated(UserBase):
         from_attributes=True
     )
 
+class CreateUserForm(UserBase):
+    password: str
+    group_id: int
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, password: str):
+        if len(password) < 8 or password.isnumeric() or password.isalpha():
+            raise ValueError("Password must contain at least 8 symbols, also not only digits or numbers.")
+        return password
+
+
 class SendNewActivationTokenSchema(BaseModel):
     email: EmailStr
