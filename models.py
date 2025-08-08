@@ -123,6 +123,13 @@ class Star(Base):
 
     movies = relationship("Movie", secondary=movie_stars, back_populates="stars")
 
+
+movie_directors = Table(
+    "movie_directors", Base.metadata,
+    Column("movie_id", Integer, ForeignKey("movies.id"), primary_key=True),
+    Column("director_id", Integer, ForeignKey("directors.id"), primary_key=True)
+)
+
 class Director(Base):
     __tablename__ = "directors"
 
