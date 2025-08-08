@@ -1,6 +1,7 @@
 from enum import Enum
 
-from sqlalchemy import Column, Integer, ForeignKey, String, Enum as SqlEnum, Boolean, DateTime, func, Date
+from sqlalchemy import Column, DECIMAL, Integer, ForeignKey, String, Enum as SqlEnum, Boolean, DateTime, func, Date, \
+    Float, Text, UniqueConstraint, Table
 from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
@@ -89,3 +90,13 @@ class RefreshToken(Base):
     expires_at = Column(DateTime)
 
     user = relationship("User", back_populates="refresh_token")
+
+
+# ------------------------- MOVIE-MODELS-----------------
+class Genre(Base):
+    __tablename__ = "genres"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(150), unique=True, nullable=False)
+
+    movies = relationship("Movie", secondary=movie_genres, back_populates="genres")
