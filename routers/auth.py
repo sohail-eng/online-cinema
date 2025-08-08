@@ -1,3 +1,5 @@
+import aiofiles
+
 from datetime import timedelta, timezone, datetime
 from typing import Annotated
 
@@ -8,12 +10,14 @@ from jose import jwt, JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
+from starlette.responses import RedirectResponse, JSONResponse
 
 import crud
 import models
 import schemas
 import security
-from models import RefreshToken
+from email_service.email_sender import send_email, generate_activation_code
+from models import RefreshToken, ActivationToken
 from schemas import AccessToken
 from settings import settings
 from crud import get_user_by_email
@@ -152,3 +156,23 @@ async def register_user(db: DpGetDB, data: schemas.CreateUserForm):
 
     send_email(user_email=user_create.email, subject="Account Activation", html=html)
     return schemas.UserCreated(id=user_create.id, email=user_create.email, group=user_create.user_group)
+
+
+@router.get("activate/{token}")
+async def activate_account(db: DpGetDB, token: str):
+    result_act_token = await db.execute(select(models.ActivationToken).filter(models.ActivationToken.token == token))
+    activation_token_obj = result_act_token.scalar_one_or_none()
+
+    if not activation_token_obj:
+        raise AttributeError("Invalid activation token")
+
+    if activation_token_obj.expires_at < datetime.now(timezone.utc):
+        return RedirectResponse(f"{settings.WEBSITE_URL}/send_new_activation_token/")
+
+    user = activation_token_obj.user
+    user.is_active = True
+    await db.delete(activation_token_obj)
+    await db.commit()
+
+    return JSONResponse(content={"detail": "You account was successfully activated!"}, status_code=status.HTTP_200_OK)
+
