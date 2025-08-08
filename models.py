@@ -107,6 +107,14 @@ class Genre(Base):
     name = Column(String(150), unique=True, nullable=False)
 
     movies = relationship("Movie", secondary=movie_genres, back_populates="genres")
+
+
+movie_stars = Table(
+    "movie_stars", Base.metadata,
+    Column("movie_id", Integer, ForeignKey("movies.id"), primary_key=True),
+    Column("stars_id", Integer, ForeignKey("stars.id"), primary_key=True)
+    )
+
 class Star(Base):
     __tablename__ = "stars"
 
