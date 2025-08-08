@@ -178,3 +178,19 @@ class Movie(Base):
 class MovieRatingEnum(str, Enum):
     like = "like"
     dislike = "dislike"
+
+# Like and Dislike
+class MovieRating(Base):
+    __tablename__ = "movie_rating"
+
+    __table_args__ = (
+        UniqueConstraint("user_profile_id", "movie_id"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id"))
+    movie_id = Column(Integer, ForeignKey("movies.id"))
+    rating = Column(SqlEnum(MovieRatingEnum))
+
+    user_profile = relationship("UserProfile", back_populates="movie_ratings")
+    movie = relationship("Movie", back_populates="movie_ratings")
