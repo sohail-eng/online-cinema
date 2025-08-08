@@ -146,3 +146,31 @@ class Certification(Base):
     name = Column(String(150), unique=True, nullable=False)
 
     movies = relationship("Movie", back_populates="certification")
+
+
+class Movie(Base):
+    __tablename__ = "movies"
+
+    __table_args__ = (
+        UniqueConstraint("name", "year", "time")
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    uuid = Column(String(200), unique=True)
+    name = Column(String(200), nullable=False, index=True)
+    year = Column(Integer, nullable=False, index=True)
+    time = Column(Integer, nullable=False)
+    imdb = Column(Float, nullable=False)
+    votes = Column(Integer, nullable=False)
+    meta_score = Column(Float, nullable=True)
+    gross = Column(Float, nullable=True)
+    description = Column(Text(1000), nullable=False)
+    price = Column(DECIMAL(13, 2), nullable=True)
+    certification_id = Column(Integer, ForeignKey("certifications.id"))
+
+    certification = relationship("Certification", back_populates="movies")
+
+    genres = relationship("Genre", secondary=movie_genres, back_populates="movies")
+    stars = relationship("Star", secondary=movie_stars, back_populates="movies")
+    directors = relationship("Director", secondary=movie_directors, back_populates="movies")
+
