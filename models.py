@@ -93,6 +93,13 @@ class RefreshToken(Base):
 
 
 # ------------------------- MOVIE-MODELS-----------------
+
+movie_genres = Table(
+    "movie_genres", Base.metadata,
+    Column("movie_id", Integer, ForeignKey("movies.id"), primary_key=True),
+    Column("genre_id", Integer, ForeignKey("genres.id"), primary_key=True)
+)
+
 class Genre(Base):
     __tablename__ = "genres"
 
