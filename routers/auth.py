@@ -3,7 +3,7 @@ import aiofiles
 from datetime import timedelta, timezone, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, BackgroundTasks
 from fastapi.params import Depends, Cookie
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt, JWTError
@@ -116,14 +116,14 @@ async def refresh_token_endpoint(user: Depends(validate_refresh_token)) -> Acces
 
 
 @router.post("register/", response_model=schemas.UserCreated)
-async def register_user(db: DpGetDB, data: schemas.CreateUserForm):
-    user = get_user_by_email(data.email, db)
+async def register_user_endpoint(db: DpGetDB, data: schemas.CreateUserForm, background_tasks: BackgroundTasks):
+    user = await get_user_by_email(data.email, db)
     if user:
-        raise AttributeError("User with provided email already exists.")
+        raise HTTPException(status_code=409, detail="User with this email already exists.")
     result_group = await db.execute(select(models.UserGroup).filter(models.UserGroup.id == data.group_id))
     user_group = result_group.scalar_one_or_none()
     if not user_group:
-        raise ValueError("Group by provided id does not exist")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Group by provided id does not exist")
 
     hashed_password = security.get_hashed_password(data.password)
     user_create = models.User(
@@ -154,17 +154,22 @@ async def register_user(db: DpGetDB, data: schemas.CreateUserForm):
 
     html = register_html.replace("{{ user_email }}", user_create.email).replace("{{ activation_link }}", activation_link)
 
-    send_email(user_email=user_create.email, subject="Account Activation", html=html)
+    background_tasks.add_task(
+        send_email,
+        user_email=user_create.email,
+        subject="Account Activation",
+        html=html
+    )
     return schemas.UserCreated(id=user_create.id, email=user_create.email, group=user_create.user_group)
 
 
 @router.get("activate/{token}")
-async def activate_account(db: DpGetDB, token: str):
+async def activate_account_endpoint(db: DpGetDB, token: str):
     result_act_token = await db.execute(select(models.ActivationToken).filter(models.ActivationToken.token == token))
     activation_token_obj = result_act_token.scalar_one_or_none()
 
     if not activation_token_obj:
-        raise AttributeError("Invalid activation token")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid activation token")
 
     if activation_token_obj.expires_at < datetime.now(timezone.utc):
         return RedirectResponse(f"{settings.WEBSITE_URL}/send_new_activation_token/{activation_token_obj.token}")
@@ -178,12 +183,12 @@ async def activate_account(db: DpGetDB, token: str):
 
 
 @router.post("send_new_activation_token/{expired_token}")
-async def send_new_activation_token(db: DpGetDB, expired_token: str, data: SendNewActivationTokenSchema):
+async def send_new_activation_token_endpoint(db: DpGetDB, expired_token: str, data: SendNewActivationTokenSchema, background_tasks: BackgroundTasks):
     result_act_token = await db.execute(select(models.ActivationToken).filter(models.ActivationToken.token == expired_token))
     expired_activation_token_obj = result_act_token.scalar_one_or_none()
 
     if not expired_activation_token_obj:
-        raise AttributeError("Invalid activation token")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid activation token")
 
     async with aiofiles.open("email_service/email_templates/register.html", "r") as f:
         html_text = await f.read()
@@ -206,6 +211,26 @@ async def send_new_activation_token(db: DpGetDB, expired_token: str, data: SendN
     await db.refresh(activation_token_new_obj)
 
     html = html_text.replace("{{ user_email }}", activation_token_new_obj.user.email).replace("{{ activation_link }}", activation_link)
-    send_email(user_email=activation_token_new_obj.user.email, subject="New Activation Token", html=html)
+    background_tasks.add_task(
+        send_email,
+        user_email=activation_token_new_obj.user.email,
+        subject="New Activation Token",
+        html=html
+    )
 
     return JSONResponse(content={"detail": "Just was sent new activation code"}, status_code=status.HTTP_200_OK)
+
+
+@router.get("logout/")
+async def logout_endpoint(db: DpGetDB, user: Depends(validate_refresh_token)):
+    result_refresh_token_to_delete = await db.execute(select(models.RefreshToken).filter(models.RefreshToken.token == user.refresh_token.token))
+    refresh_token_to_delete = result_refresh_token_to_delete.scalar_one_or_none()
+    if not refresh_token_to_delete:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Something went wrong during getting refresh token")
+
+    await db.delete(refresh_token_to_delete)
+    await db.commit()
+
+    response = JSONResponse(content={"detail": "Successfully logged out"})
+    response.delete_cookie("refresh_token")
+    return response
