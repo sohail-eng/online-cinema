@@ -18,7 +18,7 @@ import schemas
 import security
 from email_service.email_sender import send_email, generate_activation_code
 from models import RefreshToken, ActivationToken
-from schemas import AccessToken
+from schemas import AccessToken, SendNewActivationTokenSchema
 from settings import settings
 from crud import get_user_by_email
 from database import get_db
@@ -147,7 +147,7 @@ async def register_user(db: DpGetDB, data: schemas.CreateUserForm):
     await db.commit()
     await db.refresh(activation_token_obj)
 
-    activation_link = f"{settings.WEBSITE_URL}/activate/?token={activation_token_obj.token}"
+    activation_link = f"{settings.WEBSITE_URL}/activate/{activation_token_obj.token}"
 
     async with aiofiles.open("email_service/email_templates/register.html", "r") as f:
         register_html = await f.read()
@@ -167,7 +167,7 @@ async def activate_account(db: DpGetDB, token: str):
         raise AttributeError("Invalid activation token")
 
     if activation_token_obj.expires_at < datetime.now(timezone.utc):
-        return RedirectResponse(f"{settings.WEBSITE_URL}/send_new_activation_token/")
+        return RedirectResponse(f"{settings.WEBSITE_URL}/send_new_activation_token/{activation_token_obj.token}")
 
     user = activation_token_obj.user
     user.is_active = True
@@ -177,6 +177,35 @@ async def activate_account(db: DpGetDB, token: str):
     return JSONResponse(content={"detail": "You account was successfully activated!"}, status_code=status.HTTP_200_OK)
 
 
-@router.post("send_new_activation_token/")
-async def rend_new_activation_token(db: DpGetDB):
-    pass
+@router.post("send_new_activation_token/{expired_token}")
+async def send_new_activation_token(db: DpGetDB, expired_token: str, data: SendNewActivationTokenSchema):
+    result_act_token = await db.execute(select(models.ActivationToken).filter(models.ActivationToken.token == expired_token))
+    expired_activation_token_obj = result_act_token.scalar_one_or_none()
+
+    if not expired_activation_token_obj:
+        raise AttributeError("Invalid activation token")
+
+    async with aiofiles.open("email_service/email_templates/register.html", "r") as f:
+        html_text = await f.read()
+
+    new_activate_token = generate_activation_code()
+    if data.email != expired_activation_token_obj.user.email:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Please enter your correct email. (Email which was just written isn't equal to your account email)")
+
+    new_activation_token_expire = datetime.now(timezone.utc) + timedelta(hours=settings.ACTIVATION_TOKEN_EXPIRE_HOURS)
+    activation_token_new_obj = ActivationToken(
+        user_id=expired_activation_token_obj.user.id,
+        token=new_activate_token,
+        expires_at=new_activation_token_expire
+    )
+    activation_link = f"{settings.WEBSITE_URL}/activate/{new_activate_token}"
+
+    await db.delete(expired_activation_token_obj)
+    db.add(activation_token_new_obj)
+    await db.commit()
+    await db.refresh(activation_token_new_obj)
+
+    html = html_text.replace("{{ user_email }}", activation_token_new_obj.user.email).replace("{{ activation_link }}", activation_link)
+    send_email(user_email=activation_token_new_obj.user.email, subject="New Activation Token", html=html)
+
+    return JSONResponse(content={"detail": "Just was sent new activation code"}, status_code=status.HTTP_200_OK)
