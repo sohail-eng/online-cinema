@@ -1,4 +1,4 @@
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int
     WEBSITE_URL: str
     ACTIVATION_TOKEN_EXPIRE_HOURS: int
+    PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int
 
     class Config:
         env_file = ".env"

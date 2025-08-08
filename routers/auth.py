@@ -199,8 +199,10 @@ async def send_new_activation_token_endpoint(db: DpGetDB, expired_token: str, da
 
     new_activate_token = generate_secret_code()
     if data.email != expired_activation_token_obj.user.email:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                            detail="Please enter your correct email. (Email which was just written isn't equal to your account email)")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Please enter your correct email. (Email which was just written isn't equal to your account email)"
+        )
 
     new_activation_token_expire = datetime.now(timezone.utc) + timedelta(hours=settings.ACTIVATION_TOKEN_EXPIRE_HOURS)
     activation_token_new_obj = ActivationToken(
@@ -215,8 +217,7 @@ async def send_new_activation_token_endpoint(db: DpGetDB, expired_token: str, da
     await db.commit()
     await db.refresh(activation_token_new_obj)
 
-    html = html_text.replace("{{ user_email }}", activation_token_new_obj.user.email).replace("{{ activation_link }}",
-                                                                                              activation_link)
+    html = html_text.replace("{{ user_email }}", activation_token_new_obj.user.email).replace("{{ activation_link }}", activation_link)
     background_tasks.add_task(
         send_email,
         user_email=activation_token_new_obj.user.email,
@@ -232,26 +233,30 @@ async def logout_endpoint(db: DpGetDB, user: Depends(validate_refresh_token)):
     result_refresh_token_to_delete = await db.execute(
         select(models.RefreshToken).filter(models.RefreshToken.token == user.refresh_token.token))
     refresh_token_to_delete = result_refresh_token_to_delete.scalar_one_or_none()
+
     if not refresh_token_to_delete:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Something went wrong during getting refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Something went wrong during getting refresh token"
+        )
 
     await db.delete(refresh_token_to_delete)
     await db.commit()
 
-    response = JSONResponse(content={"detail": "Successfully logged out"})
+    response = JSONResponse(content={"detail": "Successfully logged out"}, status_code=status.HTTP_200_OK)
     response.delete_cookie("refresh_token")
     return response
 
 
 @router.post("/change_password/")
-async def change_password_response_endpoint(db: DpGetDB, data: schemas.ChangePasswordRequestSchema,
-                                            background_tasks: BackgroundTasks):
+async def change_password_response_endpoint(db: DpGetDB, data: schemas.ChangePasswordRequestSchema, background_tasks: BackgroundTasks):
     user = await security.get_user_by_email(email=data.email, db=db)
 
     if not user:
-        return JSONResponse(content={"detail": "We sent a Reset Code if account by provided email exists"},
-                            status_code=status.HTTP_200_OK)
+        return JSONResponse(
+            content={"detail": "We sent a Reset Code if account by provided email exists"},
+            status_code=status.HTTP_200_OK
+        )
 
     async with aiofiles.open("email_service/email_templates/change_password.html", "r") as f:
         html_template = await f.read()
@@ -268,8 +273,7 @@ async def change_password_response_endpoint(db: DpGetDB, data: schemas.ChangePas
     await db.commit()
 
     change_password_link = f"{settings.WEBSITE_URL}/change_password/{reset_token}"
-    html = html_template.replace("{{ user_email }}", user.email).replace("{{ change_password_link }}",
-                                                                         change_password_link)
+    html = html_template.replace("{{ user_email }}", user.email).replace("{{ change_password_link }}", change_password_link)
 
     background_tasks.add_task(
         send_email,
@@ -278,13 +282,14 @@ async def change_password_response_endpoint(db: DpGetDB, data: schemas.ChangePas
         html=html
     )
 
-    return JSONResponse(content={"detail": "We sent a Reset Code if account by provided email exists"},
-                        status_code=status.HTTP_200_OK)
+    return JSONResponse(
+        content={"detail": "We sent a Reset Code if account by provided email exists"},
+        status_code=status.HTTP_200_OK
+    )
 
 
 @router.post("/change_password/{change_password_token}/")
-async def change_password_endpoint(db: DpGetDB, change_password_token: str,
-                                   new_password_data: schemas.NewPasswordDataSchema):
+async def change_password_endpoint(db: DpGetDB, change_password_token: str, new_password_data: schemas.NewPasswordDataSchema):
     result_reset_code = await db.execute(
         select(models.PasswordResetToken).filter(models.PasswordResetToken.token == change_password_token))
     reset_code_obj = result_reset_code.scalar_one_or_none()
@@ -295,7 +300,7 @@ async def change_password_endpoint(db: DpGetDB, change_password_token: str,
     if reset_code_obj.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Reset code is already expired")
 
-    user = await security.get_user_by_email(email=reset_code_obj.user.email, db=db)
+    user = reset_code_obj.user
 
     hashed_password = get_hashed_password(new_password_data.passoword1)
 
