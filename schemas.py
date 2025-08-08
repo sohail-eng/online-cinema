@@ -53,3 +53,20 @@ class SendNewActivationTokenSchema(BaseModel):
 
 class ChangePasswordRequestSchema(BaseModel):
     email: EmailStr
+
+class NewPasswordDataSchema(BaseModel):
+    password1: str
+    password2: str
+
+    @model_validator(mode="after")
+    def passwords_validate(self):
+        password1 = self.password1
+        password2 = self.password2
+
+        if password1 != password2:
+            raise pydantic.ValidationError("Passwords are not equal")
+
+        if password1.isalpha() or password1.isnumeric() or len(password1) < 8:
+            return pydantic.ValidationError("Password must contain not only digits or numbers and must be longer than 8 characters")
+
+        return self
