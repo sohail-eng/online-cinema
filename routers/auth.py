@@ -109,3 +109,46 @@ async def refresh_token_endpoint(user: Depends(validate_refresh_token)) -> Acces
     }
     new_access_token = create_token(data=data, expiration=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     return schemas.AccessToken(access_token=new_access_token)
+
+
+@router.post("register/", response_model=schemas.UserCreated)
+async def register_user(db: DpGetDB, data: schemas.CreateUserForm):
+    user = get_user_by_email(data.email, db)
+    if user:
+        raise AttributeError("User with provided email already exists.")
+    result_group = await db.execute(select(models.UserGroup).filter(models.UserGroup.id == data.group_id))
+    user_group = result_group.scalar_one_or_none()
+    if not user_group:
+        raise ValueError("Group by provided id does not exist")
+
+    hashed_password = security.get_hashed_password(data.password)
+    user_create = models.User(
+        email=str(data.email),
+        hashed_password=hashed_password,
+        group_id=data.group_id
+    )
+    db.add(user_create)
+    await db.commit()
+    await db.refresh(user_create)
+
+    activation_token = generate_activation_code()
+    activation_code_expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.ACTIVATION_TOKEN_EXPIRE_HOURS)
+
+    activation_token_obj = ActivationToken(
+        user_id=user_create.id,
+        token=activation_token,
+        expires_at=activation_code_expires_at
+    )
+    db.add(activation_token_obj)
+    await db.commit()
+    await db.refresh(activation_token_obj)
+
+    activation_link = f"{settings.WEBSITE_URL}/activate/?token={activation_token_obj.token}"
+
+    async with aiofiles.open("email_service/email_templates/register.html", "r") as f:
+        register_html = await f.read()
+
+    html = register_html.replace("{{ user_email }}", user_create.email).replace("{{ activation_link }}", activation_link)
+
+    send_email(user_email=user_create.email, subject="Account Activation", html=html)
+    return schemas.UserCreated(id=user_create.id, email=user_create.email, group=user_create.user_group)
