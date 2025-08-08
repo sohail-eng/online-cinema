@@ -194,3 +194,18 @@ class MovieRating(Base):
 
     user_profile = relationship("UserProfile", back_populates="movie_ratings")
     movie = relationship("Movie", back_populates="movie_ratings")
+
+
+class MovieComment(Base):
+    __tablename__ = "movie_comments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id"))
+    movie_id = Column(Integer, ForeignKey("movies.id"))
+    text = Column(String(500), nullable=False)
+
+    movie_comment_likes = relationship("MovieCommentLike", back_populates="movie_comment")
+    movie_comment_replies = relationship("MovieCommentReply", back_populates="movie_comment")
+
+    user_profile = relationship("UserProfile", back_populates="movie_comments")
+    movie = relationship("Movie", back_populates="movie_comments")
