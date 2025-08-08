@@ -137,3 +137,12 @@ class Director(Base):
     name = Column(String(150), unique=True, nullable=False)
 
     movies = relationship("Movie", secondary=movie_directors, back_populates="directors")
+
+
+class Certification(Base):
+    __tablename__ = "certifications"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(150), unique=True, nullable=False)
+
+    movies = relationship("Movie", back_populates="certification")
