@@ -1,13 +1,15 @@
+import secrets
+
 from mailjet_rest import Client
 from settings import settings
-
 
 api_key = settings.MAILJET_API_KEY
 api_secret = settings.MAILJET_API_SECRET_KEY
 
 mailjet = Client(auth=(api_key, api_secret), version="v3.1")
 
-def send_email(user_email: str, user_name: str, subject: str, html: str) -> None:
+
+def send_email(user_email: str, subject: str, html: str, user_name: str = "User") -> None:
     admin_email = settings.ADMIN_EMAIL
     admin_full_name = settings.ADMIN_FULL_NAME
 
@@ -30,3 +32,8 @@ def send_email(user_email: str, user_name: str, subject: str, html: str) -> None
         ]
     }
     mailjet.send.create(data=data)
+
+
+def generate_secret_code(length=32) -> str:
+    return secrets.token_urlsafe(length)
+
