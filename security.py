@@ -67,3 +67,9 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: "A
     if not current_user:
         raise invalid_credentials_exception
     return current_user
+
+
+async def get_user_by_email(email, db: AsyncSession) -> models.User | None:
+    result = await db.execute(select(models.User).filter(models.User.email == email))
+    user = result.scalar_one_or_none()
+    return user
