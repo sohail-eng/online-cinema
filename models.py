@@ -122,3 +122,11 @@ class Star(Base):
     name = Column(String(150), unique=True, nullable=False)
 
     movies = relationship("Movie", secondary=movie_stars, back_populates="stars")
+
+class Director(Base):
+    __tablename__ = "directors"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(150), unique=True, nullable=False)
+
+    movies = relationship("Movie", secondary=movie_directors, back_populates="directors")
