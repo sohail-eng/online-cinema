@@ -22,3 +22,18 @@ class UserGroup(BaseModel):
     model_config = ConfigDict(
         from_attributes=True
     )
+
+
+class UserBase(BaseModel):
+    email: EmailStr
+
+class UserCreated(UserBase):
+    id: int
+    group: UserGroup
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+class SendNewActivationTokenSchema(BaseModel):
+    email: EmailStr
