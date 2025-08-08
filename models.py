@@ -174,3 +174,7 @@ class Movie(Base):
     stars = relationship("Star", secondary=movie_stars, back_populates="movies")
     directors = relationship("Director", secondary=movie_directors, back_populates="movies")
 
+
+class MovieRatingEnum(str, Enum):
+    like = "like"
+    dislike = "dislike"
