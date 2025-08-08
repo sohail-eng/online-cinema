@@ -1,6 +1,7 @@
 from typing import Optional
 
-from pydantic import BaseModel, EmailStr
+import pydantic
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, model_validator
 
 
 class TokenPayload(BaseModel):
@@ -43,9 +44,12 @@ class CreateUserForm(UserBase):
     @classmethod
     def validate_password(cls, password: str):
         if len(password) < 8 or password.isnumeric() or password.isalpha():
-            raise ValueError("Password must contain at least 8 symbols, also not only digits or numbers.")
+            raise pydantic.ValidationError("Password must contain at least 8 symbols, also not only digits or numbers.")
         return password
 
 
 class SendNewActivationTokenSchema(BaseModel):
+    email: EmailStr
+
+class ChangePasswordRequestSchema(BaseModel):
     email: EmailStr
