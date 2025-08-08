@@ -209,3 +209,18 @@ class MovieComment(Base):
 
     user_profile = relationship("UserProfile", back_populates="movie_comments")
     movie = relationship("Movie", back_populates="movie_comments")
+
+
+class MovieCommentLike(Base):
+    __tablename__ = "movie_comment_likes"
+
+    __table_args__ = (
+        UniqueConstraint("comment_id", "user_profile_id"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    comment_id = Column(Integer, ForeignKey("movie_comments.id"))
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id"))
+
+    user_profile = relationship("UserProfile", back_populates="movie_comment_likes")
+    movie_comment = relationship("MovieComment", back_populates="movie_comment_likes")
