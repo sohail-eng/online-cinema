@@ -234,3 +234,37 @@ async def logout_endpoint(db: DpGetDB, user: Depends(validate_refresh_token)):
     response = JSONResponse(content={"detail": "Successfully logged out"})
     response.delete_cookie("refresh_token")
     return response
+
+
+@router.post("/change_password/")
+async def change_password_response_endpoint(db: DpGetDB, data: schemas.ChangePasswordRequestSchema, background_tasks: BackgroundTasks):
+    user = await get_user_by_email(email=data.email, db=db)
+
+    if not user:
+        return JSONResponse(content={"detail": "We sent a Reset Code if account by provided email exists"}, status_code=status.HTTP_200_OK)
+
+    async with aiofiles.open("email_service/email_templates/change_password.html", "r") as f:
+        html_template = await f.read()
+
+    reset_expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
+
+    reset_token = generate_secret_code(length=40)
+    reset_token_obj = PasswordResetToken(
+        user_id=user.id,
+        token=reset_token,
+        expires_at=reset_expires_at
+    )
+    db.add(reset_token_obj)
+    await db.commit()
+
+    change_password_link = f"{settings.WEBSITE_URL}/change_password/{reset_token}"
+    html = html_template.replace("{{ user_email }}", user.email).replace("{{ change_password_link }}", change_password_link)
+
+    background_tasks.add_task(
+        send_email,
+        user_email=user.email,
+        subject="Reset Password Code",
+        html=html
+    )
+
+    return JSONResponse(content={"detail": "We sent a Reset Code if account by provided email exists"}, status_code=status.HTTP_200_OK)
