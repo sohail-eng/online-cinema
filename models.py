@@ -173,9 +173,10 @@ class Movie(Base):
     certification_id = Column(Integer, ForeignKey("certifications.id"))
 
     certification = relationship("Certification", back_populates="movies")
-    movie_ratings = relationship("MovieRating", back_populates="movie")
-    movie_comments = relationship("MovieComment", back_populates="movie")
-    movie_favorites = relationship("MovieFavorite", back_populates="movie")
+
+    movie_ratings = relationship("MovieRating", back_populates="movie", cascade="all, delete-orphan")
+    movie_comments = relationship("MovieComment", back_populates="movie", cascade="all, delete-orphan")
+    movie_favorites = relationship("MovieFavorite", back_populates="movie", cascade="all, delete-orphan")
 
     genres = relationship("Genre", secondary=movie_genres, back_populates="movies")
     stars = relationship("Star", secondary=movie_stars, back_populates="movies")
@@ -208,11 +209,12 @@ class MovieComment(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_profile_id = Column(Integer, ForeignKey("user_profiles.id"))
+    votes = Column(Integer, nullable=True, default=0)
     movie_id = Column(Integer, ForeignKey("movies.id"))
     text = Column(String(500), nullable=False)
 
-    movie_comment_likes = relationship("MovieCommentLike", back_populates="movie_comment")
-    movie_comment_replies = relationship("MovieCommentReply", back_populates="movie_comment")
+    movie_comment_likes = relationship("MovieCommentLike", back_populates="movie_comment", cascade="all, delete-orphan")
+    movie_comment_replies = relationship("MovieCommentReply", back_populates="movie_comment", cascade="all, delete-orphan")
 
     user_profile = relationship("UserProfile", back_populates="movie_comments")
     movie = relationship("Movie", back_populates="movie_comments")
