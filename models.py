@@ -56,12 +56,14 @@ class UserProfile(Base):
     date_of_birth = Column(Date, nullable=True)
     info = Column(String(200), nullable=True)
 
-    user = relationship("User", back_populates="user_profile")
+    user = relationship("User", back_populates="user_profile", cascade="all, delete-orphan")
 
     movie_favorite = relationship("MovieFavorite", back_populates="user_profile")
     movie_ratings = relationship("MovieRating", back_populates="user_profile")
     movie_comment_replies = relationship("MovieCommentReply", back_populates="user_profile")
     movie_comment_likes = relationship("MovieCommentLike", back_populates="user_profile")
+    movie_rate_in_stars = relationship("MovieStar", back_populates="user_profile")
+
 
 class ActivationToken(Base):
     __tablename__ = "activation_tokens"
@@ -174,9 +176,10 @@ class Movie(Base):
 
     certification = relationship("Certification", back_populates="movies")
 
-    movie_ratings = relationship("MovieRating", back_populates="movie", cascade="all, delete-orphan")
-    movie_comments = relationship("MovieComment", back_populates="movie", cascade="all, delete-orphan")
-    movie_favorites = relationship("MovieFavorite", back_populates="movie", cascade="all, delete-orphan")
+    movie_ratings = relationship("MovieRating", back_populates="movie")
+    movie_comments = relationship("MovieComment", back_populates="movie")
+    movie_favorites = relationship("MovieFavorite", back_populates="movie")
+    movie_rate_in_stars = relationship("MovieStar", back_populates="movie")
 
     genres = relationship("Genre", secondary=movie_genres, back_populates="movies")
     stars = relationship("Star", secondary=movie_stars, back_populates="movies")
@@ -196,8 +199,8 @@ class MovieRating(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_profile_id = Column(Integer, ForeignKey("user_profiles.id"))
-    movie_id = Column(Integer, ForeignKey("movies.id"))
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"))
+    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"))
     rating = Column(SqlEnum(MovieRatingEnum))
 
     user_profile = relationship("UserProfile", back_populates="movie_ratings")
@@ -208,9 +211,9 @@ class MovieComment(Base):
     __tablename__ = "movie_comments"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_profile_id = Column(Integer, ForeignKey("user_profiles.id"))
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"))
     votes = Column(Integer, nullable=True, default=0)
-    movie_id = Column(Integer, ForeignKey("movies.id"))
+    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"))
     text = Column(String(500), nullable=False)
 
     movie_comment_likes = relationship("MovieCommentLike", back_populates="movie_comment", cascade="all, delete-orphan")
@@ -228,8 +231,8 @@ class MovieCommentLike(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    comment_id = Column(Integer, ForeignKey("movie_comments.id"))
-    user_profile_id = Column(Integer, ForeignKey("user_profiles.id"))
+    comment_id = Column(Integer, ForeignKey("movie_comments.id", ondelete="CASCADE"))
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"))
 
     user_profile = relationship("UserProfile", back_populates="movie_comment_likes")
     movie_comment = relationship("MovieComment", back_populates="movie_comment_likes")
@@ -239,8 +242,8 @@ class MovieCommentReply(Base):
     __tablename__ = "movie_comment_replies"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    comment_id = Column(Integer, ForeignKey("movie_comments.id"))
-    user_profile_id = Column(Integer, ForeignKey("user_profiles.id"))
+    comment_id = Column(Integer, ForeignKey("movie_comments.id", ondelete="CASCADE"))
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"))
     text = Column(String(500), nullable=False)
 
     comment = relationship("MovieComment", back_populates="movie_comment_replies")
@@ -255,9 +258,24 @@ class MovieFavorite(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    movie_id = Column(Integer, ForeignKey("movies.id"))
-    user_profile_id = Column(Integer, ForeignKey("user_profiles.id"))
+    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"))
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"))
 
     movie = relationship("Movie", back_populates="movie_favorites")
     user_profile = relationship("UserProfile", back_populates="movie_favorites")
 
+
+class MovieStars(Base):
+    __tablename__ = "movie_rate_in_stars"
+
+    __table_args__ = (
+        UniqueConstraint("user_profile_id", "movie_id"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"))
+    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"))
+    rate = Column(Integer, nullable=False)
+
+    movie = relationship("Movie", back_populates="movie_rate_in_stars")
+    user_profile = relationship("UserProfile", back_populates="movie_rate_in_stars")
