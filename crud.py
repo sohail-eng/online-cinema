@@ -6,8 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
 import models
-from database import get_db
-from models import Movie
+import schemas
+
 
 
 async def read_movies(
@@ -65,4 +65,23 @@ async def read_movies(
 
     result = await db.execute(query)
     return result.scalars().all()
+
+
+async def create_comment(movie_id: int, db: AsyncSession, data: schemas.CommentCreateSchema, user: models.UserProfile) -> models.MovieComment | None:
+    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
+    movie = result_movie.scalar_one_or_none()
+
+    if not movie:
+        return None
+
+    comment = models.MovieComment(
+        user_profile_id=user.id,
+        movie_id=movie.id,
+        text=data.text
+    )
+    db.add(comment)
+    await db.commit()
+    await db.refresh(comment)
+
+    return comment
 
