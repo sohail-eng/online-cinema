@@ -130,21 +130,41 @@ async def reply_comment(comment_id: int, db: AsyncSession, user_profile: models.
         raise e
 
 
-async def like_comment(comment_id: int, db: AsyncSession, user_profile: models.UserProfile) -> Exception | CommentNotFoundError | None:
-    result_comment = await db.execute(select(models.MovieComment).filter(models.MovieComment.id == comment_id))
+async def like_comment_or_delete_if_exists(
+        comment_id: int,
+        db: AsyncSession,
+        user_profile: models.UserProfile
+) -> Exception | CommentNotFoundError | dict[str, str]:
+
+    result_comment = await db.execute(select(models.MovieComment).filter(
+        models.MovieComment.id == comment_id)
+    )
     comment = result_comment.scalar_one_or_none()
 
     if not comment:
         raise CommentNotFoundError("Comment was not found")
     try:
-        comment_like = models.MovieCommentLike(
-            user_profile_id=user_profile.id,
-            comment_id=comment.id
+        exist_result = await db.execute(select(models.MovieCommentLike).filter(
+            models.MovieCommentLike.user_profile_id == user_profile.id,
+            models.MovieCommentLike.comment_id == comment.id)
         )
-        comment.votes += 1
-        db.add(comment_like)
+        existing_comment_like = exist_result.scalar_one_or_none()
+
+        if not existing_comment_like:
+            comment_like = models.MovieCommentLike(
+                user_profile_id=user_profile.id,
+                comment_id=comment.id
+            )
+            comment.votes += 1
+            db.add(comment_like)
+            message = "Comment was liked"
+        else:
+            await db.delete(existing_comment_like)
+            comment.votes -= 1
+            message = "Comment was unliked"
+
         await db.commit()
-        return None
+        return {"detail": message}
     except Exception as e:
         await db.rollback()
         raise e
