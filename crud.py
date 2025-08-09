@@ -98,10 +98,12 @@ async def delete_comment(comment_id: int, db: AsyncSession, user_profile: models
 
     if not comment:
         raise CommentNotFoundError("Comment was not found")
+
     try:
         await db.delete(select(models.MovieCommentReply).filter(models.MovieCommentReply.comment_id == comment.id))
         await db.delete(comment)
         await db.commit()
+        return None
     except Exception as e:
         await db.rollback()
         raise e
@@ -142,8 +144,27 @@ async def like_comment(comment_id: int, db: AsyncSession, user_profile: models.U
         comment.movie.votes += 1
         db.add(comment_like)
         await db.commit()
+        return None
     except Exception as e:
         await db.rollback()
         raise e
 
+
+async def add_movie_to_favorite(movie_id: int, user_profile: models.UserProfile, db: AsyncSession) -> MovieNotFoundError | Exception | None:
+    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
+    movie = result_movie.scalar_one_or_none()
+
+    if not movie:
+        raise MovieNotFoundError("Movie was not found")
+    try:
+        user_favorite = models.MovieFavorite(
+            movie_id=movie_id,
+            user_profile_id=user_profile.id
+        )
+        db.add(user_favorite)
+        await db.commit()
+        return None
+    except Exception as e:
+        await db.rollback()
+        raise e
 
