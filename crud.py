@@ -7,7 +7,8 @@ from starlette import status
 
 import models
 import schemas
-
+from exceptions import CommentNotFoundError, MovieNotFoundError
+from models import MovieComment
 
 
 async def read_movies(
@@ -67,12 +68,12 @@ async def read_movies(
     return result.scalars().all()
 
 
-async def create_comment(movie_id: int, db: AsyncSession, data: schemas.CommentCreateSchema, user: models.UserProfile) -> models.MovieComment | None:
+async def create_comment(movie_id: int, db: AsyncSession, data: schemas.CommentCreateSchema, user: models.UserProfile) -> MovieNotFoundError | MovieComment:
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
     if not movie:
-        return None
+        return MovieNotFoundError("Movie was not found")
 
     comment = models.MovieComment(
         user_profile_id=user.id,
@@ -84,4 +85,22 @@ async def create_comment(movie_id: int, db: AsyncSession, data: schemas.CommentC
     await db.refresh(comment)
 
     return comment
+
+
+async def delete_comment(comment_id: int, db: AsyncSession, user: models.UserProfile):
+    result_comment = await db.execute(select(models.MovieComment.id).filter(models.MovieComment.id == comment_id))
+    comment = result_comment.scalar_one_or_none()
+
+    if not comment:
+        raise CommentNotFoundError("Comment was not found")
+    try:
+        await db.delete(select(models.MovieCommentReply).filter(models.MovieCommentReply.comment_id == comment.id))
+        await db.delete(comment)
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        print(e)
+
+    return {"status": "200"}
+
 
