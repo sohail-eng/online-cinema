@@ -7,8 +7,8 @@ from starlette import status
 
 import models
 import schemas
-from exceptions import CommentNotFoundError, MovieNotFoundError
-from models import MovieComment
+from exceptions import CommentNotFoundError, MovieNotFoundError, UserDontHavePermissionError
+from models import MovieComment, MovieCommentReply
 
 
 async def read_movies(
@@ -87,7 +87,10 @@ async def create_comment(movie_id: int, db: AsyncSession, data: schemas.CommentC
     return comment
 
 
-async def delete_comment(comment_id: int, db: AsyncSession, user: models.UserProfile):
+async def delete_comment(comment_id: int, db: AsyncSession, user_profile: models.UserProfile) -> CommentNotFoundError | None | Exception:
+    if user_profile.user.user_group == "user":
+        raise UserDontHavePermissionError("Permissions for deleting have Admins and Moderators, not regular Users")
+
     result_comment = await db.execute(select(models.MovieComment.id).filter(models.MovieComment.id == comment_id))
     comment = result_comment.scalar_one_or_none()
 
@@ -100,7 +103,29 @@ async def delete_comment(comment_id: int, db: AsyncSession, user: models.UserPro
     except Exception as e:
         await db.rollback()
         print(e)
+        raise e
 
-    return {"status": "200"}
+
+async def reply_comment(comment_id: int, db: AsyncSession, user_profile: models.UserProfile, data: schemas.CommentCreateSchema) -> Exception | CommentNotFoundError | models.MovieCommentReply:
+    result_comment = await db.execute(select(models.MovieComment).filter(models.MovieComment.id == comment_id))
+    comment = result_comment.scalar_one_or_none()
+
+    if not comment:
+        raise CommentNotFoundError("Comment was not found")
+    try:
+        comment_reply = MovieCommentReply(
+            comment_id=comment.id,
+            user_profile_id=user_profile.id,
+            text=data.text
+        )
+        db.add(comment_reply)
+        await db.commit()
+        await db.refresh(comment_reply)
+        return comment_reply
+    except Exception as e:
+        await db.rollback()
+        print(e)
+        raise e
+
 
 
