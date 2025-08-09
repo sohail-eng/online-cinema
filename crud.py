@@ -169,22 +169,45 @@ async def add_movie_to_favorite(movie_id: int, user_profile: models.UserProfile,
         raise e
 
 
-async def like_or_dislike_movie(movie_id: int, user_profile: models.UserProfile, db: AsyncSession, data: schemas.UserMovieRating):
-    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
+async def like_or_dislike_movie_and_delete_if_exists(
+        movie_id: int,
+        user_profile: models.UserProfile,
+        db: AsyncSession,
+        data: schemas.UserMovieRating
+) -> MovieNotFoundError | dict[str, str] | Exception:
+
+    result_movie = await db.execute(select(models.Movie).filter(
+        models.Movie.id == movie_id)
+    )
     movie = result_movie.scalar_one_or_none()
 
     if not movie:
         raise MovieNotFoundError("Movie was not found")
 
     try:
-        user_rating = models.MovieRating(
-            user_profile_id=user_profile.id,
-            movie_id=movie.id,
-            rating=data.rating
+        existing_result = await db.execute(select(models.MovieRating).filter(
+            models.MovieRating.user_profile_id == user_profile.id,
+            models.MovieRating.movie_id == movie.id)
         )
-        movie.votes += 1
-        db.add(user_rating)
+        existing_rating = existing_result.scalar_one_or_none()
+
+        if not existing_rating:
+            user_rating = models.MovieRating(
+                user_profile_id=user_profile.id,
+                movie_id=movie.id,
+                rating=data.rating
+            )
+            movie.votes += 1
+            db.add(user_rating)
+            message = "Rating was Created"
+
+        else:
+            await db.delete(existing_rating)
+            movie.votes -= 1
+            message = "Rating was Deleted"
+
         await db.commit()
+        return {"detail": message}
     except Exception as e:
         await db.rollback()
         raise e
