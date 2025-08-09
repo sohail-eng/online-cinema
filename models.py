@@ -248,6 +248,10 @@ class MovieCommentReply(Base):
 class MovieFavorite(Base):
     __tablename__ = "movie_favorites"
 
+    __table_args__ = (
+        UniqueConstraint("movie_id", "user_profile_id"),
+    )
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     movie_id = Column(Integer, ForeignKey("movies.id"))
     user_profile_id = Column(Integer, ForeignKey("user_profiles.id"))
