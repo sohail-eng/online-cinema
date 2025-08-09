@@ -150,20 +150,37 @@ async def like_comment(comment_id: int, db: AsyncSession, user_profile: models.U
         raise e
 
 
-async def add_movie_to_favorite(movie_id: int, user_profile: models.UserProfile, db: AsyncSession) -> MovieNotFoundError | Exception | None:
+async def add_movie_to_favorite_or_delete_if_exists(
+        movie_id: int,
+        user_profile: models.UserProfile,
+        db: AsyncSession
+) -> MovieNotFoundError | Exception | dict[str, str]:
+
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
     if not movie:
         raise MovieNotFoundError("Movie was not found")
     try:
-        user_favorite = models.MovieFavorite(
-            movie_id=movie_id,
-            user_profile_id=user_profile.id
+        exist_result = await db.execute(select(models.MovieFavorite).filter(
+            models.MovieFavorite.user_profile_id == user_profile.id,
+            models.MovieFavorite.movie_id == movie.id)
         )
-        db.add(user_favorite)
+        existing_favorite = exist_result.scalar_one_or_none()
+
+        if not existing_favorite:
+            user_favorite = models.MovieFavorite(
+                movie_id=movie_id,
+                user_profile_id=user_profile.id
+            )
+            db.add(user_favorite)
+            message = "Movie was added to favorite"
+        else:
+            await db.delete(existing_favorite)
+            message = "Movie was deleted from favorite"
+
         await db.commit()
-        return None
+        return {"detail": message}
     except Exception as e:
         await db.rollback()
         raise e
