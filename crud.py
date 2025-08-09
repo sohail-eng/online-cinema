@@ -68,23 +68,25 @@ async def read_movies(
     return result.scalars().all()
 
 
-async def create_comment(movie_id: int, db: AsyncSession, data: schemas.CommentCreateSchema, user: models.UserProfile) -> MovieNotFoundError | MovieComment:
+async def create_comment(movie_id: int, db: AsyncSession, data: schemas.CommentCreateSchema, user: models.UserProfile) -> MovieNotFoundError | models.MovieComment | Exception:
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
     if not movie:
         return MovieNotFoundError("Movie was not found")
-
-    comment = models.MovieComment(
-        user_profile_id=user.id,
-        movie_id=movie.id,
-        text=data.text
-    )
-    db.add(comment)
-    await db.commit()
-    await db.refresh(comment)
-
-    return comment
+    try:
+        comment = models.MovieComment(
+            user_profile_id=user.id,
+            movie_id=movie.id,
+            text=data.text
+        )
+        db.add(comment)
+        await db.commit()
+        await db.refresh(comment)
+        return comment
+    except Exception as e:
+        await db.rollback()
+        raise e
 
 
 async def delete_comment(comment_id: int, db: AsyncSession, user_profile: models.UserProfile) -> CommentNotFoundError | None | Exception:
@@ -102,7 +104,6 @@ async def delete_comment(comment_id: int, db: AsyncSession, user_profile: models
         await db.commit()
     except Exception as e:
         await db.rollback()
-        print(e)
         raise e
 
 
@@ -124,8 +125,25 @@ async def reply_comment(comment_id: int, db: AsyncSession, user_profile: models.
         return comment_reply
     except Exception as e:
         await db.rollback()
-        print(e)
         raise e
 
+
+async def like_comment(comment_id: int, db: AsyncSession, user_profile: models.UserProfile) -> Exception | CommentNotFoundError | None:
+    result_comment = await db.execute(select(models.MovieComment).filter(models.MovieComment.id == comment_id))
+    comment = result_comment.scalar_one_or_none()
+
+    if not comment:
+        raise CommentNotFoundError("Comment was not found")
+    try:
+        comment_like = models.MovieCommentLike(
+            user_profile_id=user_profile.id,
+            comment_id=comment.id
+        )
+        comment.movie.votes += 1
+        db.add(comment_like)
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise e
 
 
