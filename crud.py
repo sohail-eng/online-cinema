@@ -441,3 +441,43 @@ async def delete_movie(
     except Exception as e:
         await db.rollback()
         raise e
+
+
+async def update_movie(
+        movie_id: int,
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        data: schemas.MovieUpdateScheme
+):
+    if user_profile.user.user_group.name in models.UserGroupEnum.user:
+        raise UserDontHavePermissionError("User have no permissions for updating movies")
+
+    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
+    movie = result_movie.scalar_one_or_none()
+
+    if not movie:
+        raise MovieNotFoundError("Movie was not found")
+    try:
+        for field, value in data.model_dump(exclude_unset=True, exclude_none=True).items():
+            if field not in ["genre_ids", "director_ids", "star_ids"]:
+                setattr(movie, field, value)
+
+        if data.genre_ids:
+            result_genres = await db.execute(select(models.Genre).filter(models.Genre.id.in_(data.genre_ids)))
+            movie.genres = result_genres.scalars().all()
+
+        if data.director_ids:
+            result_directors = await db.execute(select(models.Director).filter(models.Director.id.in_(data.director_ids)))
+            movie.directors = result_directors.scalars().all()
+
+        if data.star_ids:
+            result_stars = await db.execute(select(models.Star).filter(models.Star.id.in_(data.star_ids)))
+            movie.stars = result_stars.scalars().all()
+
+        await db.commit()
+        await db.refresh(movie)
+        return movie
+    except Exception as e:
+        await db.rollback()
+        raise e
+
