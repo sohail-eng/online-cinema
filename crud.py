@@ -74,7 +74,6 @@ async def read_movies(
     if sort_popularity:
         query = query.order_by(models.Movie.votes.desc())
 
-
     query = query.offset(skip).limit(limit)
 
     result = await db.execute(query)
@@ -86,7 +85,6 @@ async def create_comment(
         AsyncSession, data: schemas.CommentCreateSchema,
         user: models.UserProfile
 ) -> MovieNotFoundError | models.MovieComment | Exception:
-
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
@@ -112,7 +110,6 @@ async def delete_comment(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> CommentNotFoundError | None | Exception:
-
     if user_profile.user.user_group.name == models.UserGroupEnum.user:
         raise UserDontHavePermissionError("Permissions for deleting have Admins and Moderators, not regular Users")
 
@@ -137,7 +134,6 @@ async def reply_comment(
         user_profile: models.UserProfile,
         data: schemas.CommentCreateSchema
 ) -> Exception | CommentNotFoundError | models.MovieCommentReply:
-
     result_comment = await db.execute(select(models.MovieComment).filter(
         models.MovieComment.id == comment_id)
     )
@@ -165,7 +161,6 @@ async def like_comment_or_delete_if_exists(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> Exception | CommentNotFoundError | dict[str, str]:
-
     result_comment = await db.execute(select(models.MovieComment).filter(
         models.MovieComment.id == comment_id)
     )
@@ -244,7 +239,6 @@ async def add_movie_to_favorite_or_delete_if_exists(
         user_profile: models.UserProfile,
         db: AsyncSession
 ) -> MovieNotFoundError | Exception | dict[str, str]:
-
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
@@ -281,7 +275,6 @@ async def like_or_dislike_movie_and_delete_if_exists(
         db: AsyncSession,
         data: schemas.UserMovieRating
 ) -> MovieNotFoundError | dict[str, str] | Exception:
-
     result_movie = await db.execute(select(models.Movie).filter(
         models.Movie.id == movie_id)
     )
