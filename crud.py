@@ -418,3 +418,26 @@ async def movie_create(
     except Exception as e:
         await db.rollback()
         raise e
+
+
+async def delete_movie(
+        movie_id: int,
+        db: AsyncSession,
+        user_profile: models.UserProfile
+) -> UserDontHavePermissionError | dict[str, str] | Exception:
+
+    if user_profile.user.user_group.name is models.UserGroupEnum.user:
+        raise UserDontHavePermissionError("User have not permissions to delete movies")
+
+    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
+    movie =  result_movie.scalar_one_or_none()
+
+    if not movie:
+        raise MovieNotFoundError("Movie was not found")
+    try:
+        await db.delete(movie)
+        await db.commit()
+        return {"detail": "Movie was successfully deleted."}
+    except Exception as e:
+        await db.rollback()
+        raise e
