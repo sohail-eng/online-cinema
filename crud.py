@@ -317,3 +317,41 @@ async def like_or_dislike_movie_and_delete_if_exists(
     except Exception as e:
         await db.rollback()
         raise e
+
+
+async def rate_movie_from_0_to_10_or_delete_rate_if_exists(
+        db: AsyncSession, movie_id: int,
+        data: schemas.MovieRatingFromZeroToTen,
+        user_profile: models.UserProfile
+):
+    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
+    movie = result_movie.scalar_one_or_none()
+
+    if not movie:
+        raise MovieNotFoundError("Movie was not found")
+
+    try:
+        result_exist = await db.execute(select(models.MovieStar).filter(
+            models.MovieStar.movie_id == movie.id,
+            models.MovieStar.user_profile_id == user_profile.id
+        )
+        )
+        existing_stars_rate = result_exist.scalar_one_or_none()
+        if not existing_stars_rate:
+            rate = models.MovieStar(
+                user_profile_id=user_profile.id,
+                movie_id=movie.id,
+                rate=data.rate
+            )
+            db.add(rate)
+            message = "Stars rate was created"
+        else:
+            await db.delete(existing_stars_rate)
+            message = "Stars rate was deleted"
+
+        await db.commit()
+        return {"detail": message}
+
+    except Exception as e:
+        await db.rollback()
+        raise e
