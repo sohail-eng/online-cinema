@@ -48,7 +48,7 @@ class UserProfile(Base):
     __tablename__ = "user_profiles"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True)
     first_name = Column(String(60), nullable=True)
     last_name = Column(String(60), nullable=True)
     avatar = Column(String(300), nullable=True)
@@ -56,9 +56,10 @@ class UserProfile(Base):
     date_of_birth = Column(Date, nullable=True)
     info = Column(String(200), nullable=True)
 
-    user = relationship("User", back_populates="user_profile", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="user_profile")
 
-    movie_favorite = relationship("MovieFavorite", back_populates="user_profile")
+    movie_favorites = relationship("MovieFavorite", back_populates="user_profile")
+    movie_comments = relationship("MovieComment", back_populates="user_profile")
     movie_ratings = relationship("MovieRating", back_populates="user_profile")
     movie_comment_replies = relationship("MovieCommentReply", back_populates="user_profile")
     movie_comment_likes = relationship("MovieCommentLike", back_populates="user_profile")
@@ -186,6 +187,30 @@ class Movie(Base):
     directors = relationship("Director", secondary=movie_directors, back_populates="movies")
 
 
+    @property
+    def count_of_comments(self) -> int:
+        return len(self.movie_comments)
+
+    @property
+    def count_of_ratings(self) -> int:
+        return len(self.movie_ratings)
+
+    @property
+    def count_of_favorites(self) -> int:
+        return len(self.movie_favorites)
+
+    @property
+    def average_rate_in_stars(self) -> float:
+        all_rates = [i.rate for i in self.movie_rate_in_stars]
+        if not all_rates:
+            return 0.0
+
+        sum_of_all_rates = sum(all_rates)
+        length = len(all_rates)
+
+        return sum_of_all_rates / length
+
+
 class MovieRatingEnum(str, Enum):
     like = "like"
     dislike = "dislike"
@@ -243,10 +268,11 @@ class MovieCommentReply(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     comment_id = Column(Integer, ForeignKey("movie_comments.id", ondelete="CASCADE"))
+    votes = Column(Integer, nullable=True, default=0)
     user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"))
     text = Column(String(500), nullable=False)
 
-    comment = relationship("MovieComment", back_populates="movie_comment_replies")
+    movie_comment = relationship("MovieComment", back_populates="movie_comment_replies")
     user_profile = relationship("UserProfile", back_populates="movie_comment_replies")
 
 
@@ -265,7 +291,7 @@ class MovieFavorite(Base):
     user_profile = relationship("UserProfile", back_populates="movie_favorites")
 
 
-class MovieStars(Base):
+class MovieStar(Base):
     __tablename__ = "movie_rate_in_stars"
 
     __table_args__ = (
