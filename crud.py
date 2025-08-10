@@ -371,3 +371,50 @@ async def get_movie_by_id(
 
     return movie
 
+
+async def movie_create(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        data: schemas.MovieCreateSchema
+) -> models.Movie | UserDontHavePermissionError | Exception:
+
+    if user_profile.user.user_group.name is models.UserGroupEnum.user:
+        raise UserDontHavePermissionError("User have not permissions to create new movies")
+
+    import uuid
+    movie_uuid = uuid.uuid4()
+    try:
+        result_genres = await db.execute(select(models.Genre).filter(models.Genre.id.in_(data.genre_ids)))
+        genres = result_genres.scalars().all()
+
+        result_stars = await db.execute(select(models.Star).filter(models.Star.id.in_(data.star_ids)))
+        stars = result_stars.scalars().all()
+
+        result_directors = await db.execute(select(models.Director).filter(models.Director.id.in_(data.director_ids)))
+        directors = result_directors.scalars().all()
+
+        new_movie = models.Movie(
+            uuid=movie_uuid,
+            name=data.name,
+            year=data.year,
+            time=data.time,
+            imdb=data.imdb,
+            votes=data.votes,
+            meta_score=data.meta_score,
+            gross=data.gross,
+            description=data.description,
+            price=data.price,
+            certification_id=data.certification_id,
+            # m2m
+            genres=genres,
+            directors=directors,
+            stars=stars
+        )
+        db.add(new_movie)
+        await db.commit()
+        await db.refresh(new_movie)
+
+        return new_movie
+    except Exception as e:
+        await db.rollback()
+        raise e
