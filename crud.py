@@ -355,3 +355,19 @@ async def rate_movie_from_0_to_10_or_delete_rate_if_exists(
     except Exception as e:
         await db.rollback()
         raise e
+
+
+async def get_movie_by_id(
+        movie_id: int,
+        db: AsyncSession,
+        user_profile: models.UserProfile
+) -> MovieNotFoundError | models.Movie:
+
+    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
+    movie = result_movie.scalar_one_or_none()
+
+    if not movie:
+        raise MovieNotFoundError("Movie was not found")
+
+    return movie
+
