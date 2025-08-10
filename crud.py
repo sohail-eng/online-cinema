@@ -2,10 +2,17 @@ from typing import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload, joinedload
 
 import models
 import schemas
 from exceptions import CommentNotFoundError, MovieNotFoundError, UserDontHavePermissionError
+
+
+async def get_user_by_email(email, db: AsyncSession) -> models.User | None:
+    result = await db.execute(select(models.User).filter(models.User.email == email))
+    user = result.scalar_one_or_none()
+    return user
 
 
 async def read_movies(
@@ -23,8 +30,16 @@ async def read_movies(
         search_actor: str = None,
         search_description: str = None
 ) -> Sequence[models.Movie] | None:
-
-    query = select(models.Movie)
+    query = select(models.Movie).options(
+        selectinload(models.Movie.genres),
+        selectinload(models.Movie.stars),
+        selectinload(models.Movie.directors),
+        selectinload(models.Movie.movie_comments),
+        selectinload(models.Movie.movie_ratings),
+        selectinload(models.Movie.movie_favorites),
+        selectinload(models.Movie.movie_rate_in_stars),
+        joinedload(models.Movie.certification)
+    )
 
     if search_name:
         query = query.filter(models.Movie.name.ilike(f"%{search_name}%"))
