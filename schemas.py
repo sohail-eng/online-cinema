@@ -217,3 +217,24 @@ class MovieCreateSchema(MovieBase):
     director_ids: List[int]
 
 
+class MovieRead(MovieBase):
+    id: int
+    uuid: UUID4
+    certification: Optional[CertificationSchema] = None
+
+    #custom
+    count_of_comments: int = 0
+    count_of_ratings: int = 0
+    count_of_favorites: int = 0
+    average_rate_in_stars: float = 0
+
+    #m2m
+    genres: List[GenreSchema] = []
+    stars: List[StarsSchema] = []
+    directors: List[DirectorsSchema] = []
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
