@@ -1,7 +1,11 @@
-from typing import Optional
+import datetime
+from decimal import Decimal
+from enum import Enum
+from typing import Optional, List
 
 import pydantic
-from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, model_validator
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, model_validator, Field
+from pydantic import UUID4
 
 
 class TokenPayload(BaseModel):
@@ -31,6 +35,14 @@ class UserBase(BaseModel):
 class UserCreated(UserBase):
     id: int
     group: UserGroup
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+class UserRead(UserBase):
+    id: int
+    user_group: UserGroup
 
     model_config = ConfigDict(
         from_attributes=True
