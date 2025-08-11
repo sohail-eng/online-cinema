@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
         await connection.run_sync(Base.metadata.create_all)
     yield
 
-from routers import users, movies
+app = FastAPI(lifespan=lifespan)
 
 
 @app.exception_handler(UserDontHavePermissionError)
@@ -26,5 +26,11 @@ async def handler_user_dont_have_permission_error(request, exception):
         status_code=status.HTTP_403_FORBIDDEN
     )
 
+@app.exception_handler(MovieNotFoundError)
+async def handler_movie_not_found_error(request, exception):
+    return JSONResponse(
+        content="Movie was not found",
+        status_code=status.HTTP_404_NOT_FOUND
+    )
 app.include_router(users.router)
 app.include_router(movies.router)
