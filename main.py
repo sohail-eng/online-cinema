@@ -32,5 +32,13 @@ async def handler_movie_not_found_error(request, exception):
         content="Movie was not found",
         status_code=status.HTTP_404_NOT_FOUND
     )
+
+@app.exception_handler(SomethingWentWrongError)
+async def handler_something_went_wrong(request, exception):
+    return JSONResponse(
+        content="Something went wrong",
+        status_code=status.HTTP_400_BAD_REQUEST
+    )
+
 app.include_router(users.router)
 app.include_router(movies.router)
