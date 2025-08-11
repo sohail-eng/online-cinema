@@ -40,5 +40,13 @@ async def handler_something_went_wrong(request, exception):
         status_code=status.HTTP_400_BAD_REQUEST
     )
 
+@app.exception_handler(CommentNotFoundError)
+async def handler_comment_not_found_error(request, exception):
+    return JSONResponse(
+        content="Comment was not found",
+        status_code=status.HTTP_404_NOT_FOUND
+    )
+
 app.include_router(users.router)
 app.include_router(movies.router)
+
