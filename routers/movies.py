@@ -147,3 +147,16 @@ async def movie_create_comment_endpoint(
     return created_comment
 
 
+@router.post("/movies/comments/{comment_id}/delete_comment/")
+async def movie_delete_comment_endpoint(
+        comment_id: int,
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser
+):
+    deleted_comment = await crud.delete_comment(comment_id=comment_id, db=db, user_profile=user.user_profile)
+
+    if not isinstance(deleted_comment, dict):
+        raise SomethingWentWrongError
+
+    return JSONResponse(content=f"{deleted_comment.get('detail')}", status_code=status.HTTP_200_OK)
+
