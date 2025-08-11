@@ -48,6 +48,27 @@ class UserRead(UserBase):
         from_attributes=True
     )
 
+
+class GenderEnum(str, Enum):
+    man = "MAN"
+    woman = "WOMAN"
+
+
+class UserProfileRead(BaseModel):
+    id: int
+    user: UserRead
+    first_name: Optional[str] = Field(max_length=60, default=None)
+    last_name: Optional[str] = Field(max_length=60, default=None)
+    avatar: Optional[str] = Field(max_length=300, default=None)
+    gender: Optional[GenderEnum]
+    date_of_birth: Optional[datetime.date] = None
+    info: Optional[str] = Field(max_length=200)
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
 class CreateUserForm(UserBase):
     password: str
     group_id: int
