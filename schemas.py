@@ -114,3 +114,13 @@ class CommentReadAfterCreationSchema(BaseModel):
 
 class CommentCreateSchema(BaseModel):
     text: str = Field(max_length=500)
+
+
+class LikeOrDislikeEnum(str, Enum):
+    like = "LIKE"
+    dislike = "DISLIKE"
+
+
+class UserMovieRating(BaseModel):
+    rating: LikeOrDislikeEnum
+
