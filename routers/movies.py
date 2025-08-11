@@ -126,3 +126,24 @@ async def movie_create_endpoint(
 
     return created_movie
 
+
+@router.post("/movies/{movie_id}/create_comment/", response_model=schemas.CommentReadAfterCreationSchema)
+async def movie_create_comment_endpoint(
+        movie_id: int,
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        data: schemas.CommentCreateSchema
+):
+    created_comment = await crud.create_comment(
+        movie_id=movie_id,
+        db=db,
+        user_profile=user.user_profile,
+        data=data
+    )
+
+    if not isinstance(created_comment, models.MovieComment):
+        raise SomethingWentWrongError
+
+    return created_comment
+
+
