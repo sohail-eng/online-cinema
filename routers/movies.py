@@ -253,3 +253,21 @@ async def movie_like_or_dislike_or_delete_like_or_dislike_endpoint(
 
     return JSONResponse(content=f"{like_or_dislike_or_delete.get('detail')}", status_code=status.HTTP_200_OK)
 
+
+@router.post("/movies/{movie_id}/rate_from_zero_to_ten/")
+async def movie_rate_from_sero_to_ten_endpoint(
+        movie_id: int,
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        data: schemas.MovieRatingFromZeroToTen
+):
+    rate_movie = await crud.rate_movie_from_0_to_10_or_delete_rate_if_exists(
+        db=db,
+        movie_id=movie_id,
+        data=data,
+        user_profile=user.user_profile
+    )
+    if not isinstance(rate_movie, dict):
+        raise SomethingWentWrongError
+
+    return JSONResponse(content=f"{rate_movie.get('detail')}", status_code=status.HTTP_200_OK)
