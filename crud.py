@@ -17,8 +17,10 @@ async def get_user_by_email(email, db: AsyncSession) -> models.User | None:
 
 async def read_movies(
         db: AsyncSession,
+        user_profile: models.UserProfile,
         skip: int = 0,
         limit: int = 20,
+        favorite_list: bool = False,
         filter_imdb: int = None,
         filter_release_year: int = None,
         sort_release_year: int = None,
@@ -30,16 +32,21 @@ async def read_movies(
         search_actor: str = None,
         search_description: str = None
 ) -> Sequence[models.Movie] | None:
+
     query = select(models.Movie).options(
         selectinload(models.Movie.genres),
         selectinload(models.Movie.stars),
-        selectinload(models.Movie.directors),
         selectinload(models.Movie.movie_comments),
+        selectinload(models.Movie.directors),
         selectinload(models.Movie.movie_ratings),
         selectinload(models.Movie.movie_favorites),
         selectinload(models.Movie.movie_rate_in_stars),
         joinedload(models.Movie.certification)
     )
+
+    if favorite_list:
+        subquery = select(models.MovieFavorite.movie_id).filter(models.MovieFavorite.user_profile_id == user_profile.id)
+        query = query.filter(models.Movie.id.in_(subquery.scalar_subquery()))
 
     if search_name:
         query = query.filter(models.Movie.name.ilike(f"%{search_name}%"))
