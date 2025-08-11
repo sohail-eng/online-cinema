@@ -112,3 +112,17 @@ async def movie_update_endpoint(
 
     return updated_movie
 
+
+@router.post("/movies/create/", response_model=schemas.MovieReadDetail)
+async def movie_create_endpoint(
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        data: schemas.MovieCreateSchema
+):
+    created_movie = await crud.movie_create(db=db, user_profile=user.user_profile, data=data)
+
+    if not isinstance(created_movie, models.Movie):
+        raise SomethingWentWrongError
+
+    return created_movie
+
