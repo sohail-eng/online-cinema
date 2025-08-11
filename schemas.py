@@ -146,3 +146,21 @@ class GenreSchema(BaseModel):
     )
 
 
+# M2M
+class StarsSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
+class DirectorsSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
