@@ -59,3 +59,27 @@ async def movies_list_endpoint(
         return JSONResponse({"detail": "Movies not found"}, status_code=404)
 
     return filtered_movies
+
+
+@router.get("/movies/{movie_id}/", response_model=schemas.MovieReadDetail)
+async def movie_detail_endpoint(
+        movie_id: int,
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser
+) -> MovieReadDetail:
+
+    movie_dict = await get_movie_by_id(movie_id=movie_id, db=db, user_profile=user.user_profile)
+    movie_detail = schemas.MovieReadDetail.model_validate(movie_dict.get("movie"))
+    movie_detail = movie_detail.model_copy(update={
+        "average_rate_in_stars": movie_dict.get("average_rate_in_stars"),
+        "in_favorite_by_current_user": movie_dict.get("in_favorite_by_current_user"),
+        "current_user_star_rating": movie_dict.get("current_user_star_rating"),
+        "current_user_like_or_dislike": movie_dict.get("current_user_like_or_dislike"),
+        "liked_comments_current_movie_ids": movie_dict.get("liked_comments_current_movie_ids"),
+        "count_of_likes_current_movie": movie_dict.get("count_of_likes_current_movie"),
+        "count_of_dislikes_current_movie": movie_dict.get("count_of_dislikes"),
+        "current_user_comment_ids": movie_dict.get("current_user_comment_ids"),
+        "current_user_replies_ids": movie_dict.get("current_user_replies_ids")
+    })
+    return movie_detail
+
