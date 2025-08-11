@@ -272,3 +272,17 @@ class MovieReadDetail(MovieBase):
     )
 
 
+class MovieUpdateScheme(BaseModel):
+    name: Optional[str] = None
+    year: Optional[int] = None
+    time: Optional[int] = None
+    imdb: Optional[float] = None
+    meta_score: Optional[float] = None
+    gross: Optional[float] = None
+    description: Optional[str] = None
+    price: Optional[Decimal] = None
+    certification_id: Optional[int] = None
+
+    genre_ids: Optional[List[int]] = None
+    star_ids: Optional[List[int]] = None
+    director_ids: Optional[List[int]] = None
