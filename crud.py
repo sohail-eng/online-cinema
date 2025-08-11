@@ -1,16 +1,23 @@
 from typing import Sequence
 
+import aiofiles
+from fastapi import BackgroundTasks
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.sql.functions import func
 
 import models
 import schemas
-from exceptions import CommentNotFoundError, MovieNotFoundError, UserDontHavePermissionError
+from email_service.email_sender import send_email
+from exceptions import CommentNotFoundError, MovieNotFoundError, UserDontHavePermissionError, SomethingWentWrongError
 
 
 async def get_user_by_email(email, db: AsyncSession) -> models.User | None:
-    result = await db.execute(select(models.User).filter(models.User.email == email))
+    result = await db.execute(select(models.User).filter(models.User.email == email).options(
+        joinedload(models.User.user_group),
+        joinedload(models.User.user_profile)
+    ))
     user = result.scalar_one_or_none()
     return user
 
