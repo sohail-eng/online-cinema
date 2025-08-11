@@ -83,3 +83,17 @@ async def movie_detail_endpoint(
     })
     return movie_detail
 
+
+@router.post("/movies/{movie_id}/delete/")
+async def movie_delete_endpoint(
+        movie_id: int,
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser
+) -> JSONResponse:
+    deleted_movie = await crud.delete_movie(movie_id=movie_id, db=db, user_profile=user.user_profile)
+
+    if not isinstance(deleted_movie, dict):
+        raise SomethingWentWrongError
+
+    return JSONResponse(content=f"{deleted_movie.get('detail')}", status_code=status.HTTP_200_OK)
+
