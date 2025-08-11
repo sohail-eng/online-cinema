@@ -188,3 +188,13 @@ class MovieCommentReply(BaseModel):
     )
 
 
+class MovieComments(BaseModel):
+    id: int
+    text: str
+    user_profile: UserProfileRead
+    movie_comment_replies: List[MovieCommentReply]
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
