@@ -175,3 +175,16 @@ class MovieCommentReplyCreate(BaseModel):
 class MovieCommentReplyCreatedRead(MovieCommentReplyCreate):
     id: int
 
+
+class MovieCommentReply(BaseModel):
+    id: int
+    votes: Optional[int] = 0
+    comment_id: int
+    user_profile: UserProfileRead
+    text: str = Field(max_length=500)
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
