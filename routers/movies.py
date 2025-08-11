@@ -97,3 +97,18 @@ async def movie_delete_endpoint(
 
     return JSONResponse(content=f"{deleted_movie.get('detail')}", status_code=status.HTTP_200_OK)
 
+
+@router.post("/movies/{movie_id}/update/", response_model=schemas.MovieRead)
+async def movie_update_endpoint(
+        movie_id: int,
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        data: schemas.MovieUpdateScheme
+) -> models.Movie:
+    updated_movie = await crud.update_movie(movie_id=movie_id, db=db, user_profile=user.user_profile, data=data)
+
+    if not isinstance(updated_movie, models.Movie):
+        raise SomethingWentWrongError
+
+    return updated_movie
+
