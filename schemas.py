@@ -238,3 +238,37 @@ class MovieRead(MovieBase):
     )
 
 
+class MovieReadDetail(MovieBase):
+    id: int
+    uuid: UUID4
+    certification: Optional[CertificationSchema] = None
+
+    #custom
+    in_favorite_by_current_user: Optional[bool] = None
+    current_user_star_rating: Optional[int] = None
+    current_user_like_or_dislike: Optional[str] = None
+    liked_comments_current_movie_ids: Optional[list[int]] = None
+    count_of_likes_current_movie: Optional[int] = None
+    count_of_dislikes_current_movie: Optional[int] = None
+    current_user_comment_ids: Optional[list[int]] = None
+    current_user_replies_ids: Optional[list[int]] = None
+    average_rate_in_stars: Optional[float] = 0
+    count_of_comments: Optional[int] = 0
+    count_of_ratings: Optional[int] = 0
+    count_of_favorites: Optional[int] = 0
+
+    is_favorite: bool = False
+
+    #o2m
+    movie_comments: List[MovieComments] = []
+
+    #m2m
+    genres: List[GenreSchema] = []
+    stars: List[StarsSchema] = []
+    directors: List[DirectorsSchema] = []
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
