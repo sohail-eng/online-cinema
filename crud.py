@@ -520,7 +520,7 @@ async def get_movie_by_id(
             "count_of_favorites": count_of_favorites
         }
     except Exception as e:
-        print("An error occured in get_movie_by_id")
+        print("An error occurred in get_movie_by_id")
         raise e
 
 

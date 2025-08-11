@@ -73,7 +73,7 @@ async def login_endpoint(form_data: Annotated[OAuth2PasswordRequestForm, Depends
         "sub": user.email,
         "role": user.user_group.name
     }
-    access_token = create_token(data=data, expiration=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))  #sync func
+    access_token = create_token(data=data, expiration=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     data.update({"type": "refresh"})
     refresh_expires_at = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     refresh_token = create_token(data=data, expiration=refresh_expires_at)
