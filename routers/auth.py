@@ -8,7 +8,7 @@ from fastapi.params import Depends, Cookie
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import jwt, JWTError
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from starlette import status
 from starlette.responses import RedirectResponse, JSONResponse
 
@@ -16,23 +16,53 @@ import crud
 import models
 import schemas
 import security
+from dependencies import DpGetDB
 from email_service.email_sender import send_email, generate_secret_code
 from models import RefreshToken, ActivationToken, PasswordResetToken
 from schemas import AccessToken, SendNewActivationTokenSchema
 from settings import settings
-from database import get_db
 from security import create_token, verify_password, get_hashed_password
 
 router = APIRouter()
 
-DpGetDB = Annotated[AsyncSession, Depends(get_db)]
+
+async def validate_refresh_token(refresh_token: Annotated[str | None, Cookie()], db: DpGetDB) -> models.User:
+    invalid_token_exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                            detail="Invalid Refresh Token was provided")
+
+    if not refresh_token:
+        raise invalid_token_exception
+
+    result = await db.execute(select(models.RefreshToken).filter(models.RefreshToken.token == refresh_token))
+    refresh_token_obj = result.scalar_one_or_none()
+    if not refresh_token_obj:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token wasn't provided")
+    try:
+        payload = jwt.decode(token=refresh_token_obj.token, key=settings.SECRET_KEY, algorithms=settings.ALGORITHM)
+        token_exp = payload.get("exp", "")
+        token_type = payload.get("type", "")
+        token_sub = payload.get("sub", "")
+
+        if not token_exp or not token_type or not token_sub:
+            raise invalid_token_exception
+
+        if token_exp < int(datetime.now(timezone.utc).timestamp()) or token_type != "refresh":
+            raise invalid_token_exception
+
+    except JWTError:
+        raise invalid_token_exception
+
+    user = await crud.get_user_by_email(email=token_sub, db=db)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User from refresh token not exist")
+    return user
 
 
 @router.post("/login/", response_model=schemas.LoginTokens)
 async def login_endpoint(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: DpGetDB, response: Response):
     email = form_data.username
     password = form_data.password
-    user = await security.get_user_by_email(email, db)
+    user = await crud.get_user_by_email(email, db)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User by provided email was not fount...")
     password_check = verify_password(password, user.hashed_password)
@@ -41,7 +71,7 @@ async def login_endpoint(form_data: Annotated[OAuth2PasswordRequestForm, Depends
     data = {
         "type": "access",
         "sub": user.email,
-        "role": user.user_group
+        "role": user.user_group.name
     }
     access_token = create_token(data=data, expiration=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     data.update({"type": "refresh"})
@@ -70,40 +100,8 @@ async def login_endpoint(form_data: Annotated[OAuth2PasswordRequestForm, Depends
     )
 
 
-async def validate_refresh_token(refresh_token: Annotated[str | None, Cookie()], db: DpGetDB):
-    invalid_token_exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                                            detail="Invalid Refresh Token was provided")
-
-    if not refresh_token:
-        raise invalid_token_exception
-
-    result = await db.execute(select(models.RefreshToken).filter(models.RefreshToken.token == refresh_token))
-    refresh_token_obj = result.scalar_one_or_none()
-    if not refresh_token_obj:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token wasn't provided")
-    try:
-        payload = jwt.decode(token=refresh_token_obj.token, key=settings.SECRET_KEY, algorithms=settings.ALGORITHM)
-        token_exp = payload.get("exp", "")
-        token_type = payload.get("type", "")
-        token_sub = payload.get("sub", "")
-
-        if not token_exp or not token_type or not token_sub:
-            raise invalid_token_exception
-
-        if token_exp < datetime.now(timezone.utc) or token_type != "refresh":
-            raise invalid_token_exception
-
-    except JWTError:
-        raise invalid_token_exception
-
-    user = await crud.get_user_by_email(token_sub, db)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User from refresh token not exist")
-    return user
-
-
 @router.post("/token/refresh/")
-async def refresh_token_endpoint(user: Depends(validate_refresh_token)) -> AccessToken:
+async def refresh_token_endpoint(user: Annotated[models.User, Depends(validate_refresh_token)]) -> AccessToken:
     if not user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Something went wrong. Try again.")
 
@@ -118,7 +116,7 @@ async def refresh_token_endpoint(user: Depends(validate_refresh_token)) -> Acces
 
 @router.post("/register/", response_model=schemas.UserCreated)
 async def register_user_endpoint(db: DpGetDB, data: schemas.CreateUserForm, background_tasks: BackgroundTasks):
-    user = await security.get_user_by_email(data.email, db)
+    user = await crud.get_user_by_email(data.email, db)
     if user:
         raise HTTPException(status_code=409, detail="User with this email already exists.")
     result_group = await db.execute(select(models.UserGroup).filter(models.UserGroup.id == data.group_id))
@@ -136,6 +134,9 @@ async def register_user_endpoint(db: DpGetDB, data: schemas.CreateUserForm, back
     await db.commit()
     await db.refresh(user_create)
 
+    user_profile = models.UserProfile(
+        user_id=user_create.id
+    )
     activation_token = generate_secret_code()
     activation_code_expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.ACTIVATION_TOKEN_EXPIRE_HOURS)
 
@@ -145,6 +146,7 @@ async def register_user_endpoint(db: DpGetDB, data: schemas.CreateUserForm, back
         expires_at=activation_code_expires_at
     )
     db.add(activation_token_obj)
+    db.add(user_profile)
     await db.commit()
     await db.refresh(activation_token_obj)
 
@@ -167,13 +169,15 @@ async def register_user_endpoint(db: DpGetDB, data: schemas.CreateUserForm, back
 
 @router.get("/activate/{token}/")
 async def activate_account_endpoint(db: DpGetDB, token: str):
-    result_act_token = await db.execute(select(models.ActivationToken).filter(models.ActivationToken.token == token))
+    result_act_token = await db.execute(select(models.ActivationToken).filter(models.ActivationToken.token == token).options(
+        selectinload(models.ActivationToken.user)
+    ))
     activation_token_obj = result_act_token.scalar_one_or_none()
 
     if not activation_token_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid activation token")
 
-    if activation_token_obj.expires_at < datetime.now(timezone.utc):
+    if activation_token_obj.expires_at.timestamp() < datetime.now(timezone.utc).timestamp():
         return RedirectResponse(f"{settings.WEBSITE_URL}/send_new_activation_token/{activation_token_obj.token}")
 
     user = activation_token_obj.user
@@ -229,7 +233,7 @@ async def send_new_activation_token_endpoint(db: DpGetDB, expired_token: str, da
 
 
 @router.get("/logout/")
-async def logout_endpoint(db: DpGetDB, user: Depends(validate_refresh_token)):
+async def logout_endpoint(db: DpGetDB, user: Annotated[models.User, Depends(validate_refresh_token)]):
     result_refresh_token_to_delete = await db.execute(
         select(models.RefreshToken).filter(models.RefreshToken.token == user.refresh_token.token))
     refresh_token_to_delete = result_refresh_token_to_delete.scalar_one_or_none()
@@ -250,7 +254,7 @@ async def logout_endpoint(db: DpGetDB, user: Depends(validate_refresh_token)):
 
 @router.post("/change_password/")
 async def change_password_response_endpoint(db: DpGetDB, data: schemas.ChangePasswordRequestSchema, background_tasks: BackgroundTasks):
-    user = await security.get_user_by_email(email=data.email, db=db)
+    user = await crud.get_user_by_email(email=data.email, db=db)
 
     if not user:
         return JSONResponse(
