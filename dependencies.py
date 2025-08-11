@@ -1,5 +1,5 @@
 from typing import Annotated
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
@@ -11,7 +11,7 @@ import models
 from database import get_db
 from settings import settings
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login/")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login/")
 
 DpGetDB = Annotated[AsyncSession, Depends(get_db)]
 
