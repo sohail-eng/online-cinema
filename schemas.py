@@ -103,3 +103,14 @@ class NewPasswordDataSchema(BaseModel):
             return pydantic.ValidationError("Password must contain not only digits or numbers and must be longer than 8 characters")
 
         return self
+
+
+class CommentReadAfterCreationSchema(BaseModel):
+    id: int
+    user_profile_id: int
+    movie_id: int
+    text: str
+
+
+class CommentCreateSchema(BaseModel):
+    text: str = Field(max_length=500)
