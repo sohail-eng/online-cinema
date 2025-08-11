@@ -123,7 +123,7 @@ async def delete_comment(
         comment_id: int,
         db: AsyncSession,
         user_profile: models.UserProfile
-) -> CommentNotFoundError | None | Exception:
+) -> CommentNotFoundError | dict[str, str] | Exception:
     if user_profile.user.user_group.name == models.UserGroupEnum.user:
         raise UserDontHavePermissionError("Permissions for deleting have Admins and Moderators, not regular Users")
 
@@ -136,7 +136,7 @@ async def delete_comment(
     try:
         await db.delete(comment)
         await db.commit()
-        return None
+        return {"detail": "Comment was successfully deleted"}
     except Exception as e:
         await db.rollback()
         raise e
@@ -146,16 +146,64 @@ async def reply_comment(
         comment_id: int,
         db: AsyncSession,
         user_profile: models.UserProfile,
-        data: schemas.CommentCreateSchema
+        data: schemas.MovieCommentReplyCreate,
+        background_task: BackgroundTasks
 ) -> Exception | CommentNotFoundError | models.MovieCommentReply:
     result_comment = await db.execute(select(models.MovieComment).filter(
-        models.MovieComment.id == comment_id)
+        models.MovieComment.id == comment_id).options(
+        joinedload(models.MovieComment.user_profile),
+        joinedload(models.UserProfile.user)
+        )
     )
     comment = result_comment.scalar_one_or_none()
 
     if not comment:
         raise CommentNotFoundError("Comment was not found")
+
     try:
+        result_reply_comment_creator = await db.execute(select(models.UserProfile).filter(
+            models.UserProfile.id == comment.user_profile_id
+        ).options(joinedload(models.UserProfile.user)))
+
+        reply_comment_creator = result_reply_comment_creator.scalar_one_or_none()
+
+        if not reply_comment_creator:
+            raise SomethingWentWrongError("Creator does not exists.")
+
+        async with aiofiles.open("email_service/email_templates/reply_comment.html", "r") as f:
+            reply_comment_html = await f.read()
+
+        result_comment_movie_name = await db.execute(select(models.Movie.name).filter(models.Movie.id == comment.movie_id))
+        comment_movie_name = result_comment_movie_name.scalar_one_or_none()
+
+        recipient_name = (reply_comment_creator.first_name + " " + reply_comment_creator.last_name) if (
+                reply_comment_creator.first_name and reply_comment_creator.last_name
+        ) else reply_comment_creator.user.email
+
+        reply_author = (comment.user_profile.first_name + " " + comment.user_profile.last_name) if (
+                comment.user_profile.first_name and comment.user_profile.last_name
+        ) else comment.user_profile.user.email
+
+        reply_comment_html = reply_comment_html.replace(
+        "{{recipient_name}}", recipient_name
+        ).replace(
+            "{{movie_title}}", comment_movie_name or "Without Name"
+        ).replace(
+            "{{reply_author}}", reply_author
+        ).replace(
+            "{{comment_text}}", comment.text
+        ).replace(
+            "{{reply_text}}", data.text
+        )
+
+        if reply_comment_creator.user.email:
+            background_task.add_task(
+                send_email,
+                user_email=reply_comment_creator.user.email,
+                subject="You have just got new reply for your comment.",
+                html=reply_comment_html
+            )
+
         comment_reply = models.MovieCommentReply(
             comment_id=comment.id,
             user_profile_id=user_profile.id,
