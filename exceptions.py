@@ -6,3 +6,6 @@ class MovieNotFoundError(Exception):
 
 class UserDontHavePermissionError(Exception):
     pass
+
+class SomethingWentWrongError(Exception):
+    pass
