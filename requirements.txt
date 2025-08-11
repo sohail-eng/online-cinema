@@ -16,7 +16,9 @@ click-plugins==1.1.1.2
 click-repl==0.3.0
 colorama==0.4.6
 cryptography==45.0.6
+dnspython==2.7.0
 ecdsa==0.19.1
+email_validator==2.2.0
 fastapi==0.116.1
 greenlet==3.2.3
 h11==0.16.0
@@ -36,6 +38,7 @@ pydantic_core==2.33.2
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 python-jose==3.5.0
+python-multipart==0.0.20
 redis==6.4.0
 requests==2.32.4
 rsa==4.9.1
