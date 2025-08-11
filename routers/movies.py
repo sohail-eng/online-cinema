@@ -232,3 +232,24 @@ async def movie_add_to_favorite_or_delete_if_exists_endpoint(
         raise SomethingWentWrongError
 
     return JSONResponse(content=f"{add_to_favorite_or_delete.get('detail')}", status_code=status.HTTP_200_OK)
+
+
+@router.post("/movies/{movie_id}/like_or_dislike_or_delete/")
+async def movie_like_or_dislike_or_delete_like_or_dislike_endpoint(
+        movie_id: int,
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        data: schemas.UserMovieRating
+):
+    like_or_dislike_or_delete = await crud.like_or_dislike_movie_and_delete_if_exists(
+        movie_id=movie_id,
+        user_profile=user.user_profile,
+        db=db,
+        data=data
+    )
+
+    if not isinstance(like_or_dislike_or_delete, dict):
+        raise SomethingWentWrongError
+
+    return JSONResponse(content=f"{like_or_dislike_or_delete.get('detail')}", status_code=status.HTTP_200_OK)
+
