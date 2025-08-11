@@ -210,3 +210,10 @@ class MovieBase(BaseModel):
     price: Optional[Decimal] = None
 
 
+class MovieCreateSchema(MovieBase):
+    certification_id: int
+    genre_ids: List[int]
+    star_ids: List[int]
+    director_ids: List[int]
+
+
