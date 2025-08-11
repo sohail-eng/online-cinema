@@ -198,3 +198,21 @@ async def movie_comment_like_or_delete_like_if_exists_endpoint(
     return JSONResponse(content=f"{like_or_delete_like.get('detail')}", status_code=status.HTTP_200_OK)
 
 
+@router.post("/movies/comments/comment_replies/{reply_id}/like_or_delete_like/")
+async def movie_comment_reply_like_or_delete_like_if_exists_endpoint(
+        reply_id: int,
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser
+):
+    comment_like_or_unlike = await crud.like_comment_reply_or_delete_if_exists(
+        comment_reply_id=reply_id,
+        db=db,
+        user_profile=user.user_profile
+    )
+
+    if not isinstance(comment_like_or_unlike, dict):
+        raise SomethingWentWrongError
+
+    return JSONResponse(content=f"{comment_like_or_unlike.get('detail')}", status_code=status.HTTP_200_OK)
+
+
