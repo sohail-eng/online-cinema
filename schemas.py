@@ -124,3 +124,14 @@ class LikeOrDislikeEnum(str, Enum):
 class UserMovieRating(BaseModel):
     rating: LikeOrDislikeEnum
 
+
+class MovieRatingFromZeroToTen(BaseModel):
+    rate: int = Field(ge=0, le=10)
+
+
+class CertificationSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
