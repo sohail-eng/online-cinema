@@ -164,3 +164,14 @@ class DirectorsSchema(BaseModel):
         from_attributes=True
     )
 
+
+class MovieCommentReplyCreate(BaseModel):
+    votes: Optional[int] = 0
+    comment_id: int
+    user_profile_id: int
+    text: str = Field(max_length=500)
+
+
+class MovieCommentReplyCreatedRead(MovieCommentReplyCreate):
+    id: int
+
