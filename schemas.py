@@ -198,3 +198,15 @@ class MovieComments(BaseModel):
         from_attributes=True
     )
 
+class MovieBase(BaseModel):
+    name: str
+    year: int
+    time: int
+    imdb: float
+    votes: int
+    meta_score: Optional[float] = None
+    gross: Optional[float] = None
+    description: str
+    price: Optional[Decimal] = None
+
+
