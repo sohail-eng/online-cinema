@@ -135,3 +135,14 @@ class CertificationSchema(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+# M2M
+class GenreSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
