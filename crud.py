@@ -97,7 +97,7 @@ async def read_movies(
 async def create_comment(
         movie_id: int, db:
         AsyncSession, data: schemas.CommentCreateSchema,
-        user: models.UserProfile
+        user_profile: models.UserProfile
 ) -> MovieNotFoundError | models.MovieComment | Exception:
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
@@ -106,7 +106,7 @@ async def create_comment(
         raise MovieNotFoundError("Movie was not found")
     try:
         comment = models.MovieComment(
-            user_profile_id=user.id,
+            user_profile_id=user_profile.id,
             movie_id=movie.id,
             text=data.text
         )
@@ -337,6 +337,7 @@ async def like_or_dislike_movie_and_delete_if_exists(
         db: AsyncSession,
         data: schemas.UserMovieRating
 ) -> MovieNotFoundError | dict[str, str] | Exception:
+
     result_movie = await db.execute(select(models.Movie).filter(
         models.Movie.id == movie_id)
     )
@@ -375,7 +376,8 @@ async def like_or_dislike_movie_and_delete_if_exists(
 
 
 async def rate_movie_from_0_to_10_or_delete_rate_if_exists(
-        db: AsyncSession, movie_id: int,
+        db: AsyncSession,
+        movie_id: int,
         data: schemas.MovieRatingFromZeroToTen,
         user_profile: models.UserProfile
 ):
@@ -416,9 +418,27 @@ async def get_movie_by_id(
         movie_id: int,
         db: AsyncSession,
         user_profile: models.UserProfile
-) -> MovieNotFoundError | models.Movie:
+) -> dict[str, models.Movie | bool]:
+    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id).options(
+        selectinload(models.Movie.stars),
+        selectinload(models.Movie.genres),
+        selectinload(models.Movie.directors),
 
-    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
+        selectinload(models.Movie.movie_comments).options(
+            selectinload(models.MovieComment.movie_comment_replies).options(
+                selectinload(models.MovieCommentReply.user_profile).options(
+                    selectinload(models.UserProfile.user).joinedload(models.User.user_group)
+                ),
+            ),
+            selectinload(models.MovieComment.user_profile).options(
+                selectinload(models.UserProfile.user).joinedload(models.User.user_group)
+            ),
+        ),
+        selectinload(models.Movie.movie_rate_in_stars),
+        selectinload(models.Movie.movie_favorites),
+        selectinload(models.Movie.movie_ratings),
+        joinedload(models.Movie.certification)
+    ))
     movie = result_movie.scalar_one_or_none()
 
     if not movie:
