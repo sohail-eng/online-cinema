@@ -380,7 +380,8 @@ async def rate_movie_from_0_to_10_or_delete_rate_if_exists(
         movie_id: int,
         data: schemas.MovieRatingFromZeroToTen,
         user_profile: models.UserProfile
-):
+) -> dict[str, str] | MovieNotFoundError | Exception:
+
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
@@ -418,7 +419,8 @@ async def get_movie_by_id(
         movie_id: int,
         db: AsyncSession,
         user_profile: models.UserProfile
-) -> dict[str, models.Movie | bool]:
+) -> dict[str, models.Movie | bool] | MovieNotFoundError | Exception:
+
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id).options(
         selectinload(models.Movie.stars),
         selectinload(models.Movie.genres),
@@ -443,8 +445,83 @@ async def get_movie_by_id(
 
     if not movie:
         raise MovieNotFoundError("Movie was not found")
+    try:
+        result_movie_user_star = await db.execute(select(models.MovieStar.rate).filter(
+            models.MovieStar.user_profile_id == user_profile.id,
+            models.MovieStar.movie_id == movie.id)
+        )
+        result_current_user_like_or_dislike = await db.execute(select(models.MovieRating.rating).filter(
+            models.MovieRating.user_profile_id == user_profile.id,
+            models.MovieRating.movie_id == movie.id)
+        )
+        result_count_of_likes = await db.execute(select(func.count().filter(
+            models.MovieRating.rating == models.MovieRatingEnum.like))
+        )
 
-    return movie
+        result_count_of_dislikes = await db.execute(select(func.count()).filter(
+            models.MovieRating.rating == models.MovieRatingEnum.dislike)
+        )
+
+        result_current_user_replies_ids = await db.execute(select(models.MovieCommentReply.id).filter(
+            models.MovieCommentReply.user_profile_id == user_profile.id,
+            models.MovieCommentReply.movie_comment.has(
+                models.MovieComment.movie_id == movie.id
+            )
+        ))
+
+        result_current_user_comment_ids = await db.execute(select(models.MovieComment.id).filter(
+            models.MovieComment.user_profile_id == user_profile.id,
+            models.MovieComment.movie_id == movie.id
+        ))
+
+        result_liked_comments_current_movie = await db.execute(select(models.MovieCommentLike.comment_id).filter(
+            models.MovieCommentLike.user_profile_id == user_profile.id,
+            models.MovieCommentLike.movie_comment.has(models.MovieComment.movie_id == movie.id)
+        )
+        )
+
+        result_all_rates = await db.execute(select(models.MovieStar.rate).filter(models.MovieStar.movie_id == movie.id))
+        all_rates = result_all_rates.scalars().all()
+        if not all_rates:
+            average_rate_in_stars = 0.0
+        else:
+            sum_of_all_rates = sum(all_rates)
+            length = len(all_rates)
+
+            average_rate_in_stars = sum_of_all_rates / length
+
+        current_user_star_rating = result_movie_user_star.scalar_one_or_none()
+        current_user_like_or_dislike = result_current_user_like_or_dislike.scalar_one_or_none()
+        in_favorite_by_current_user = True if user_profile.user.id in movie.movie_favorites else False
+        count_of_likes = result_count_of_likes.scalar_one_or_none()
+        count_of_dislikes = result_count_of_dislikes.scalar_one_or_none()
+
+        count_of_ratings = len(movie.movie_ratings)
+        count_of_comments = len(movie.movie_comments)
+        count_of_favorites = len(movie.movie_favorites)
+
+        current_user_comment_ids = result_current_user_comment_ids.scalars().all()
+        current_user_replies_ids = result_current_user_replies_ids.scalars().all()
+        liked_comments_current_movie_ids = result_liked_comments_current_movie.scalars().all()
+
+        return {
+            "movie": movie,
+            "in_favorite_by_current_user": in_favorite_by_current_user,
+            "current_user_star_rating": current_user_star_rating,
+            "current_user_like_or_dislike": current_user_like_or_dislike,
+            "liked_comments_current_movie_ids": liked_comments_current_movie_ids,
+            "count_of_likes_current_movie": count_of_likes,
+            "count_of_dislikes_current_movie": count_of_dislikes,
+            "current_user_comment_ids": current_user_comment_ids,
+            "current_user_replies_ids": current_user_replies_ids,
+            "average_rate_in_stars": average_rate_in_stars,
+            "count_of_ratings": count_of_ratings,
+            "count_of_comments": count_of_comments,
+            "count_of_favorites": count_of_favorites
+        }
+    except Exception as e:
+        print("An error occured in get_movie_by_id")
+        raise e
 
 
 async def movie_create(
@@ -505,7 +582,7 @@ async def delete_movie(
         raise UserDontHavePermissionError("User have not permissions to delete movies")
 
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
-    movie =  result_movie.scalar_one_or_none()
+    movie = result_movie.scalar_one_or_none()
 
     if not movie:
         raise MovieNotFoundError("Movie was not found")
@@ -542,7 +619,8 @@ async def update_movie(
             movie.genres = result_genres.scalars().all()
 
         if data.director_ids:
-            result_directors = await db.execute(select(models.Director).filter(models.Director.id.in_(data.director_ids)))
+            result_directors = await db.execute(
+                select(models.Director).filter(models.Director.id.in_(data.director_ids)))
             movie.directors = result_directors.scalars().all()
 
         if data.star_ids:
@@ -555,4 +633,3 @@ async def update_movie(
     except Exception as e:
         await db.rollback()
         raise e
-
