@@ -332,3 +332,8 @@ class CartPurchasedReadSchema(BaseModel):
         from_attributes=True
     )
 
+
+class CartReadSchema(CartPurchasedReadSchema):
+    #cutom
+    total_price: Optional[Decimal] = None
+
