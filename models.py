@@ -323,3 +323,21 @@ class Cart(Base):
     def count_of_all_items_in_cart(self):
         return len(self.cart_items)
 
+
+class CartItem(Base):
+    __tablename__ = "cart_items"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "cart_id", "movie_id"
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cart_id = Column(Integer, ForeignKey("carts.id", ondelete="CASCADE"), nullable=False)
+    movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    is_paid = Column(Boolean, default=False)
+    added_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+
+    cart = relationship("Cart", back_populates="cart_items")
+    movie = relationship("Movie", back_populates="cart_items")
