@@ -10,6 +10,7 @@ import models
 import schemas
 from crud import get_movie_by_id
 from exceptions import SomethingWentWrongError
+from models import MovieCommentReply, MovieComment, Movie
 from schemas import MovieReadDetail
 
 router = APIRouter()
