@@ -928,3 +928,31 @@ async def admin_user_cart_detail(
         raise CartNotExistError("Cart by provided id does not exists")
 
     return cart
+
+
+# -------------------------------------------------- ORDER
+
+async def order_list(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        offset: int = 0,
+        limit: int = 20
+) -> Sequence[models.Order]:
+
+    result_all_orders = await db.execute(select(models.Order).filter(
+        models.Order.user_profile_id == user_profile.id).options(
+        joinedload(models.Order.user_profile).options(
+            joinedload(models.UserProfile.user)
+        ),
+        selectinload(models.Order.order_items).options(
+            joinedload(models.OrderItem.movie).options(
+                selectinload(models.Movie.genres),
+                selectinload(models.Movie.stars),
+                selectinload(models.Movie.directors)
+            )
+        )
+    ).offset(offset).limit(limit))
+    all_orders = result_all_orders.scalars().all()
+    total_items = len(all_orders)
+
+    return {"all_orders": all_orders, "total_items": total_items}
