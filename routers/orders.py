@@ -34,3 +34,21 @@ async def order_list_endpoint(
         total_items=order_list.get("total_items")
     )
 
+
+@router.get("/orders/{order_id}/", response_model=schemas.OrderDetailSchema)
+async def order_detail_endpoint(
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        order_id: int
+) -> models.Order:
+
+    order_detail = await crud.order_detail(
+        db=db,
+        user_profile=user.user_profile,
+        order_id=order_id
+    )
+    if not isinstance(order_detail, models.Order):
+        raise SomethingWentWrongError
+
+    return order_detail
+
