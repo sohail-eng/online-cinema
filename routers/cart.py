@@ -164,3 +164,23 @@ async def admin_add_movie_to_users_cart(
         raise SomethingWentWrongError
 
     return JSONResponse(content=f"{add_item.get('detail')}", status_code=status.HTTP_200_OK)
+
+
+@router.post("/carts/{user_cart_id}/remove_movie/{movie_id}")
+async def admin_remove_movie_from_user_cart(
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        user_cart_id: int,
+        movie_id: int
+) -> JSONResponse:
+
+    deleted_item = await crud.cart_remove_item(
+        db=db,
+        user_profile=user.user_profile,
+        user_cart_id=user_cart_id,
+        movie_id=movie_id
+    )
+    if not isinstance(deleted_item, dict):
+        raise SomethingWentWrongError
+
+    return JSONResponse(content=f"{deleted_item.get('detail')}", status_code=status.HTTP_200_OK)
