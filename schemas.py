@@ -302,3 +302,19 @@ class MovieCartRead(BaseModel):
     genres: List[GenreSchema]
     stars: List[StarsSchema]
     directors: List[DirectorsSchema]
+
+# ----------------------------------------------- CART
+
+# users cart
+class CartItemsReadSchema(BaseModel):
+     id: int
+     cart_id: int
+     movie_id: int
+     added_at: int
+     is_paid: bool
+
+     movie: MovieCartRead
+
+     model_config = ConfigDict(
+         from_attributes=True
+     )
