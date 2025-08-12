@@ -114,3 +114,33 @@ async def order_refuse_endpoint(
     )
 
 
+@router.get("/orders/list/", response_model=schemas.OrderDetailPaginatedSchema)
+async def admin_users_order_list_endpoint(
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        user_email: str = None,
+        date: datetime = None,
+        status: str = None,
+        limit: int = 20,
+        offset: int = 0
+) -> schemas.OrderDetailPaginatedSchema:
+
+    user_orders = await crud.admin_users_order_list(
+        db=db,
+        user_profile=user.user_profile,
+        search_by_user_email=user_email,
+        filter_by_date=date,
+        filter_by_status=status,
+        limit=limit,
+        skip=offset
+    )
+
+    if not isinstance(user_orders, dict):
+        raise SomethingWentWrongError
+
+    return schemas.OrderDetailPaginatedSchema(
+        orders=user_orders.get("orders"),
+        offset=user_orders.get("offset", 0),
+        limit=user_orders.get("limit", 0),
+        total_items=user_orders.get("total_items", 0)
+    )
