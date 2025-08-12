@@ -1034,3 +1034,22 @@ async def create_order(
     except Exception as e:
         await db.rollback()
         raise e
+
+
+async def order_confirm(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        order_id: int
+) -> OrderDoesNotExistError | dict[str, str]:
+    result_order = await db.execute(select(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.user_profile_id == user_profile.id)
+    )
+    order = result_order.scalar_one_or_none()
+
+    if not order:
+        raise OrderDoesNotExistError("Order by provided id does not exists")
+
+    ### LOGIC STRIPE
+    return {"detail": "redirect_to_stripe_url"}
+
