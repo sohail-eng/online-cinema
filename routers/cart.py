@@ -124,3 +124,22 @@ async def admin_carts_list_endpoint(
         raise SomethingWentWrongError
 
     return carts_list
+
+
+@router.get("/carts/{user_cart_id}/", response_model=schemas.CartReadSchema)
+async def admin_user_cart_endpoint(
+        user_cart_id: int,
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser
+) -> Cart:
+
+    user_cart = crud.admin_user_cart_detail(
+        db=db,
+        user_profile=user.user_profile,
+        user_cart_id=user_cart_id
+    )
+
+    if not isinstance(user_cart, models.Cart):
+        raise SomethingWentWrongError
+
+    return user_cart
