@@ -386,3 +386,11 @@ class OrderBaseSchema(BaseModel):
     model_config = ConfigDict(
         from_attributes=True
     )
+
+class OrderListSchema(OrderBaseSchema):
+    user_profile_id: UserProfileRead
+    order_items: List[OrderItemReadSchema]
+
+    @computed_field
+    def order_items_count(self):
+        return len(self.order_items)
