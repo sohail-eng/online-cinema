@@ -372,3 +372,6 @@ class OrderItemBaseSchema(BaseModel):
 class OrderItemReadSchema(OrderItemBaseSchema):
     movie: MovieCartRead
 
+
+class OrderItemDetailSchema(OrderItemBaseSchema):
+    movie: MovieOrderItemView
