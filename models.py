@@ -1,7 +1,7 @@
 from enum import Enum
 
 from sqlalchemy import Column, DECIMAL, Integer, ForeignKey, String, Enum as SqlEnum, Boolean, DateTime, func, Date, \
-    Float, Text, UniqueConstraint, Table
+    Float, Text, UniqueConstraint, Table, TIMESTAMP
 from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
@@ -64,6 +64,7 @@ class UserProfile(Base):
     movie_comment_replies = relationship("MovieCommentReply", back_populates="user_profile")
     movie_comment_likes = relationship("MovieCommentLike", back_populates="user_profile")
     movie_rate_in_stars = relationship("MovieStar", back_populates="user_profile")
+    cart = relationship("Cart", back_populates="user_profile")
 
 
 class ActivationToken(Base):
@@ -167,6 +168,7 @@ class Movie(Base):
     name = Column(String(200), nullable=False, index=True)
     year = Column(Integer, nullable=False, index=True)
     time = Column(Integer, nullable=False)
+    image = Column(String(500), nullable=True)
     imdb = Column(Float, nullable=False)
     votes = Column(Integer, nullable=False)
     meta_score = Column(Float, nullable=True)
@@ -181,6 +183,7 @@ class Movie(Base):
     movie_comments = relationship("MovieComment", back_populates="movie")
     movie_favorites = relationship("MovieFavorite", back_populates="movie")
     movie_rate_in_stars = relationship("MovieStar", back_populates="movie")
+    cart_items = relationship("CartItem", back_populates="movie")
 
     genres = relationship("Genre", secondary=movie_genres, back_populates="movies")
     stars = relationship("Star", secondary=movie_stars, back_populates="movies")
@@ -305,3 +308,13 @@ class MovieStar(Base):
 
     movie = relationship("Movie", back_populates="movie_rate_in_stars")
     user_profile = relationship("UserProfile", back_populates="movie_rate_in_stars")
+
+
+class Cart(Base):
+    __tablename__ = "carts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"), unique=True)
+
+    user_profile = relationship("UserProfile", back_populates="cart")
+    cart_items = relationship("CartItem", back_populates="cart")
