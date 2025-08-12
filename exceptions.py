@@ -15,3 +15,6 @@ class MovieAlreadyIsPurchasedOrInCartError(Exception):
 
 class CartNotExistError(Exception):
     pass
+
+class OrderDoesNotExistError(Exception):
+    pass
