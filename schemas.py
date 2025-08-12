@@ -368,3 +368,7 @@ class OrderItemBaseSchema(BaseModel):
     model_config = ConfigDict(
         from_attributes=True
     )
+
+class OrderItemReadSchema(OrderItemBaseSchema):
+    movie: MovieCartRead
+
