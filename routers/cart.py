@@ -49,3 +49,31 @@ async def cart_remove_item_endpoint(
 
     return JSONResponse(content=f"{removed_item.get('detail')}", status_code=status.HTTP_200_OK)
 
+
+@router.get("/cart/items/", response_model=schemas.CartReadSchema)
+async def cart_list_endpoint(
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        search_by_book_name: str = None
+) -> schemas.CartReadSchema:
+    cart_items = await crud.cart_items_list(
+        db=db,
+        user_profile=user.user_profile,
+        search_by_book_name=search_by_book_name
+    )
+    if not cart_items:
+        raise SomethingWentWrongError
+
+    if not isinstance(cart_items, dict):
+        raise SomethingWentWrongError
+
+    cart_items_list = [schemas.CartItemsReadSchema.model_validate(item) for item in cart_items.get("cart_items", [])]
+
+    return schemas.CartReadSchema(
+        cart_id=cart_items.get("id", None),
+        cart_items=cart_items_list,
+        user_profile=user.user_profile,
+        total_price=cart_items.get("total_price"),
+    )
+
+
