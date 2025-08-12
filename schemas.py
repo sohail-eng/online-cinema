@@ -375,3 +375,14 @@ class OrderItemReadSchema(OrderItemBaseSchema):
 
 class OrderItemDetailSchema(OrderItemBaseSchema):
     movie: MovieOrderItemView
+
+
+class OrderBaseSchema(BaseModel):
+    id: int
+    created_at: datetime
+    status: models.OrderStatusEnum
+    total_amount: Decimal
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
