@@ -30,3 +30,22 @@ async def cart_add_item_endpoint(
 
     return JSONResponse(content=f"{added_item.get('detail')}", status_code=status.HTTP_200_OK)
 
+
+@router.delete("/cart/remove_item/{movie_id}")
+async def cart_remove_item_endpoint(
+        movie_id: int,
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser
+) -> JSONResponse:
+
+    removed_item = await crud.cart_remove_item(
+        db=db,
+        movie_id=movie_id,
+        user_profile=user.user_profile
+    )
+
+    if not isinstance(removed_item, dict):
+        raise SomethingWentWrongError
+
+    return JSONResponse(content=f"{removed_item.get('detail')}", status_code=status.HTTP_200_OK)
+
