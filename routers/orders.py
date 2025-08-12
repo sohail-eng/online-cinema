@@ -52,3 +52,23 @@ async def order_detail_endpoint(
 
     return order_detail
 
+
+@router.post("/order/create/")
+async def create_order_endpoint(
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+) -> RedirectResponse:
+
+    create_order = await crud.create_order(
+        db=db,
+        user_profile=user.user_profile,
+    )
+    if not isinstance(create_order, models.Order):
+        raise SomethingWentWrongError
+
+    return RedirectResponse(
+        url=f"/orders/{create_order.id}/",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
