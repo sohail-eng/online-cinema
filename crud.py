@@ -900,3 +900,31 @@ async def admin_carts_list(
     result_carts = await db.execute(query)
     return result_carts.scalars().all()
 
+
+async def admin_user_cart_detail(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        user_cart_id: int,
+):
+    if user_profile.user.user_group == models.UserGroupEnum.user:
+        raise UserDontHavePermissionError
+
+    result_cart = await db.execute(select(models.Cart).filter(models.Cart.id == user_cart_id).options(
+        selectinload(models.Cart.cart_items).options(
+            joinedload(models.CartItem.movie).options(
+                selectinload(models.Movie.genres),
+                selectinload(models.Movie.stars),
+                selectinload(models.Movie.directors),
+                joinedload(models.Movie.certification)
+            ),
+        ),
+        joinedload(models.Cart.user_profile).options(
+            joinedload(models.UserProfile.user)
+        )
+    ))
+    cart = result_cart.scalar_one_or_none()
+
+    if not cart:
+        raise CartNotExistError("Cart by provided id does not exists")
+
+    return cart
