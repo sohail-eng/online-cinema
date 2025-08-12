@@ -65,6 +65,7 @@ class UserProfile(Base):
     movie_comment_likes = relationship("MovieCommentLike", back_populates="user_profile")
     movie_rate_in_stars = relationship("MovieStar", back_populates="user_profile")
     cart = relationship("Cart", back_populates="user_profile")
+    order = relationship("Order", back_populates="user_profile")
 
 
 class ActivationToken(Base):
@@ -337,7 +338,74 @@ class CartItem(Base):
     cart_id = Column(Integer, ForeignKey("carts.id", ondelete="CASCADE"), nullable=False)
     movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
     is_paid = Column(Boolean, default=False)
-    added_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+    added_at = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp())
 
     cart = relationship("Cart", back_populates="cart_items")
     movie = relationship("Movie", back_populates="cart_items")
+
+
+class OrderStatusEnum(str, Enum):
+    pending = "PENDING"
+    paid = "PAID"
+    canceled = "CANCELED"
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"))
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp)
+    status = Column(SqlEnum(OrderStatusEnum), default=OrderStatusEnum.pending)
+    total_amount = Column(DECIMAL(10, 2))
+
+    order_items = relationship("OrderItem", back_populates="order")
+    user_profile = relationship("UserProfile", back_populates="order")
+    payments = relationship("Payment", back_populates="order")
+
+
+class OrderItem(Base):
+    __tablename__ = "order_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    movie_id = Column(Integer, ForeignKey("movies.id"), nullable=False)
+    price_at_order = Column(DECIMAL(10, 2))
+
+    order = relationship("Order", back_populates="order_items")
+    movie = relationship("Movie", back_populates="order_items")
+    payment_items = relationship("PaymentItem", back_populates="order_item")
+
+
+class PaymentStatusEnum(str, Enum):
+    successful = "SUCCESSFUL"
+    canceled = "CANCELED"
+    refunded = "REFUNDED"
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"), nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp)
+    status = Column(SqlEnum(PaymentStatusEnum), default=PaymentStatusEnum.successful)
+    amount = Column(DECIMAL(10, 2))
+    external_payment_id = Column(String(400))
+
+    user_profile = relationship("UserProfile", back_populates="payments")
+    order = relationship("Order", back_populates="payments")
+    payment_items = relationship("PaymentItem", back_populates="payment")
+
+
+class PaymentItem(Base):
+    __tablename__ = "payment_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    payment_id = Column(Integer, ForeignKey("payments.id"), nullable=False)
+    order_item_id = Column(Integer, ForeignKey("orders.id"), unique=True, nullable=False)
+    price_at_payment = Column(DECIMAL(10, 2), nullable=False)
+
+    payment = relationship("Payment", back_populates="payment_items")
+    order_item = relationship("OrderItem", back_populates="payment_item")

@@ -4,8 +4,10 @@ from enum import Enum
 from typing import Optional, List
 
 import pydantic
-from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, model_validator, Field
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, model_validator, Field, computed_field
 from pydantic import UUID4
+
+import models
 
 
 class TokenPayload(BaseModel):
@@ -211,6 +213,17 @@ class MovieBase(BaseModel):
     price: Optional[Decimal] = None
 
 
+class MovieOrderItemView(MovieBase):
+    genres: List[GenreSchema]
+    uuid: UUID4
+    stars: List[StarsSchema]
+    directors: List[DirectorsSchema]
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
 class MovieCreateSchema(MovieBase):
     certification_id: int
     genre_ids: List[int]
@@ -344,3 +357,64 @@ class AdminCartsSchema(BaseModel):
 
     #cutom
     count_of_all_items_in_cart: Optional[int] = 0
+
+
+# -------------------- ORDER
+class OrderItemBaseSchema(BaseModel):
+    id: int
+    order_id: int
+    price_at_order: Decimal
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+class OrderItemReadSchema(OrderItemBaseSchema):
+    movie: MovieCartRead
+
+
+class OrderItemDetailSchema(OrderItemBaseSchema):
+    movie: MovieOrderItemView
+
+
+class OrderBaseSchema(BaseModel):
+    id: int
+    created_at: datetime
+    status: models.OrderStatusEnum
+    total_amount: Decimal
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+class OrderListSchema(OrderBaseSchema):
+    user_profile_id: UserProfileRead
+    order_items: List[OrderItemReadSchema]
+
+    @computed_field
+    def order_items_count(self):
+        return len(self.order_items)
+
+class OrdersPaginatedSchema(BaseModel):
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    total_items: Optional[int] = None
+
+    items: List[OrderListSchema]
+
+
+class OrderDetailSchema(OrderBaseSchema):
+    user_profile: UserProfileRead
+    order_items: List[OrderItemDetailSchema]
+
+    @computed_field
+    def order_items_count(self):
+        return len(self.order_items)
+
+
+class OrderDetailPaginatedSchema(BaseModel):
+    offset: Optional[int] = None
+    limit: Optional[int] = None
+    total_items: Optional[int] = None
+
+    orders: OrderDetailSchema

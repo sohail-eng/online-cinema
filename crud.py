@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Sequence, Any
 
 import aiofiles
@@ -11,7 +12,7 @@ import models
 import schemas
 from email_service.email_sender import send_email
 from exceptions import CommentNotFoundError, MovieNotFoundError, UserDontHavePermissionError, SomethingWentWrongError, \
-    MovieAlreadyIsPurchasedOrInCartError, CartNotExistError
+    MovieAlreadyIsPurchasedOrInCartError, CartNotExistError, OrderDoesNotExistError
 from models import CartItem, Cart
 
 
@@ -44,7 +45,6 @@ async def read_movies(
         search_actor: str = None,
         search_description: str = None
 ) -> Sequence[models.Movie] | None:
-
     query = select(models.Movie).options(
         selectinload(models.Movie.genres),
         selectinload(models.Movie.stars),
@@ -104,7 +104,6 @@ async def create_comment(
         AsyncSession, data: schemas.CommentCreateSchema,
         user_profile: models.UserProfile
 ) -> MovieNotFoundError | models.MovieComment | Exception:
-
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
@@ -130,7 +129,6 @@ async def delete_comment(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> CommentNotFoundError | dict[str, str] | Exception:
-
     if user_profile.user.user_group.name == models.UserGroupEnum.user:
         raise UserDontHavePermissionError("Permissions for deleting have Admins and Moderators, not regular Users")
 
@@ -156,7 +154,6 @@ async def reply_comment(
         data: schemas.MovieCommentReplyCreate,
         background_task: BackgroundTasks
 ) -> Exception | CommentNotFoundError | models.MovieCommentReply:
-
     result_comment = await db.execute(select(models.MovieComment).filter(
         models.MovieComment.id == comment_id).options(
         joinedload(models.MovieComment.user_profile),
@@ -232,7 +229,6 @@ async def like_comment_or_delete_if_exists(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> Exception | CommentNotFoundError | dict[str, str]:
-
     result_comment = await db.execute(select(models.MovieComment).filter(
         models.MovieComment.id == comment_id)
     )
@@ -272,7 +268,6 @@ async def like_comment_reply_or_delete_if_exists(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> Exception | CommentNotFoundError | dict[str, str]:
-
     result_comment_reply = await db.execute(select(models.MovieCommentReply).filter(
         models.MovieCommentReply.id == comment_reply_id)
     )
@@ -312,7 +307,6 @@ async def add_movie_to_favorite_or_delete_if_exists(
         user_profile: models.UserProfile,
         db: AsyncSession
 ) -> MovieNotFoundError | Exception | dict[str, str]:
-
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
@@ -349,7 +343,6 @@ async def like_or_dislike_movie_and_delete_if_exists(
         db: AsyncSession,
         data: schemas.UserMovieRating
 ) -> MovieNotFoundError | dict[str, str] | Exception:
-
     result_movie = await db.execute(select(models.Movie).filter(
         models.Movie.id == movie_id)
     )
@@ -393,7 +386,6 @@ async def rate_movie_from_0_to_10_or_delete_rate_if_exists(
         data: schemas.MovieRatingFromZeroToTen,
         user_profile: models.UserProfile
 ) -> dict[str, str] | MovieNotFoundError | Exception:
-
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
@@ -432,7 +424,6 @@ async def get_movie_by_id(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> dict[str, models.Movie | bool] | MovieNotFoundError | Exception:
-
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id).options(
         selectinload(models.Movie.stars),
         selectinload(models.Movie.genres),
@@ -541,7 +532,6 @@ async def movie_create(
         user_profile: models.UserProfile,
         data: schemas.MovieCreateSchema
 ) -> models.Movie | UserDontHavePermissionError | Exception:
-
     if user_profile.user.user_group.name is models.UserGroupEnum.user:
         raise UserDontHavePermissionError("User have not permissions to create new movies")
 
@@ -589,7 +579,6 @@ async def delete_movie(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> UserDontHavePermissionError | dict[str, str] | Exception:
-
     if user_profile.user.user_group.name is models.UserGroupEnum.user:
         raise UserDontHavePermissionError("User have not permissions to delete movies")
 
@@ -599,7 +588,8 @@ async def delete_movie(
     if not movie:
         raise MovieNotFoundError("Movie was not found")
 
-    result_movie_in_users_cart = await db.execute(select(models.CartItem.id).filter(models.CartItem.movie_id == movie.id))
+    result_movie_in_users_cart = await db.execute(
+        select(models.CartItem.id).filter(models.CartItem.movie_id == movie.id))
     movie_in_users_cart = result_movie_in_users_cart.scalars().all()
 
     if not movie_in_users_cart:
@@ -612,6 +602,7 @@ async def delete_movie(
             raise e
     else:
         return {"detail": "You can not delete the movie because it is in user's cart"}
+
 
 async def update_movie(
         movie_id: int,
@@ -662,7 +653,6 @@ async def cart_add_item(
         movie_id: int,
         user_cart_id: int = None,
 ) -> MovieNotFoundError | UserDontHavePermissionError | dict[str, str]:
-
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
@@ -690,8 +680,8 @@ async def cart_add_item(
             models.CartItem.is_paid == True,
             models.CartItem.cart.has(
                 models.Cart.user_profile == cart.user_profile_id
-                )
             )
+        )
         )
         all_purchased_movies_ids = result_all_purchased_movies_ids.scalars().all()
 
@@ -715,7 +705,6 @@ async def cart_remove_item(
         movie_id: int,
         user_cart_id: int = None
 ) -> Exception | MovieNotFoundError | dict[str, str]:
-
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
@@ -725,16 +714,16 @@ async def cart_remove_item(
     if not user_cart_id:
         result_user_cart_item = await db.execute(select(models.CartItem).filter(
             models.CartItem.movie_id == movie.id, models.CartItem.cart.has(
-            models.Cart.user_profile_id == user_profile.id)
-            )
+                models.Cart.user_profile_id == user_profile.id)
+        )
         )
     else:
         if user_profile.user.user_group.name == models.UserGroupEnum.user:
             raise UserDontHavePermissionError("User have not permissions to delete items from other user's carts")
         result_user_cart_item = await db.execute(select(models.CartItem).filter(
             models.CartItem.movie_id == movie.id, models.CartItem.cart.has(
-            models.Cart.id == user_cart_id)
-            )
+                models.Cart.id == user_cart_id)
+        )
         )
 
     user_cart_item = result_user_cart_item.scalar_one_or_none()
@@ -757,7 +746,6 @@ async def cart_items_list(
         user_profile: models.UserProfile,
         search_by_book_name: str = None
 ) -> dict[str, int | None | Cart | Any]:
-
     if not search_by_book_name:
         query = select(models.Cart).filter(
             models.Cart.user_profile_id == user_profile.id,
@@ -779,7 +767,7 @@ async def cart_items_list(
             models.Cart.user_profile_id == user_profile.id,
             models.Cart.cart_items.has(
                 models.CartItem.movie.has(
-                    models.Movie.name.icontains(search_by_book_name)
+                    models.Movie.name.ilike(f"%{search_by_book_name}%")
                 ),
                 models.CartItem.is_paid != True
             )).options(
@@ -823,7 +811,6 @@ async def cart_purchased_items(
         user_profile: models.UserProfile,
         search_by_book_name: str = None
 ) -> dict[str, int | None | Any]:
-
     if not search_by_book_name:
         query = select(models.Cart).filter(
             models.Cart.user_profile_id == user_profile.id,
@@ -845,7 +832,7 @@ async def cart_purchased_items(
             models.Cart.user_profile_id == user_profile.id,
             models.Cart.cart_items.has(
                 models.CartItem.movie.has(
-                    models.Movie.name.icontains(search_by_book_name)
+                    models.Movie.name.ilike(f"%{search_by_book_name}%")
                 ),
                 models.CartItem.is_paid == True
             )).options(
@@ -928,3 +915,203 @@ async def admin_user_cart_detail(
         raise CartNotExistError("Cart by provided id does not exists")
 
     return cart
+
+
+# -------------------------------------------------- ORDER
+
+async def order_list(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        offset: int = 0,
+        limit: int = 20
+) -> Sequence[models.Order]:
+
+    result_all_orders = await db.execute(select(models.Order).filter(
+        models.Order.user_profile_id == user_profile.id).options(
+        joinedload(models.Order.user_profile).options(
+            joinedload(models.UserProfile.user)
+        ),
+        selectinload(models.Order.order_items).options(
+            joinedload(models.OrderItem.movie).options(
+                selectinload(models.Movie.genres),
+                selectinload(models.Movie.stars),
+                selectinload(models.Movie.directors)
+            )
+        )
+    ).offset(offset).limit(limit))
+    all_orders = result_all_orders.scalars().all()
+    total_items = len(all_orders)
+
+    return {"all_orders": all_orders, "total_items": total_items}
+
+
+async def order_detail(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        order_id: int
+) -> models.Order | OrderDoesNotExistError:
+
+    result_order = await db.execute(select(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.user_profile_id == user_profile.id).options(
+            joinedload(models.Order.user_profile).options(
+                joinedload(models.UserProfile.user)
+            ),
+            selectinload(models.Order.order_items).options(
+                joinedload(models.OrderItem.movie).options(
+                    selectinload(models.Movie.genres),
+                    selectinload(models.Movie.directors),
+                    selectinload(models.Movie.stars)
+                )
+            )
+
+        )
+    )
+    order = result_order.scalar_one_or_none()
+
+    if not order:
+        raise OrderDoesNotExistError("Order was not found")
+
+    return order
+
+
+async def create_order(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+) -> models.Order | Exception:
+
+    result_user_items_price = await db.execute(
+        select(func.sum(models.Movie.price))
+        .select_from(models.CartItem)
+        .join(models.CartItem.movie)
+        .join(models.CartItem.cart)
+        .filter(models.Cart.user_profile_id == user_profile.id)
+    )
+    result_user_items = await db.execute(select(CartItem).filter(
+        models.CartItem.cart.has(
+            models.Cart.user_profile_id == user_profile.id,
+            ),
+        models.CartItem.is_paid == False
+        ).options(
+        joinedload(models.CartItem.movie)
+        )
+    )
+    user_items = result_user_items.scalars().all()
+    total_amount = result_user_items_price.scalar_one_or_none() or 0.00
+    try:
+        new_order = models.Order(
+            user_profile_id=user_profile.id,
+            total_amount=total_amount
+        )
+        db.add(new_order)
+        await db.commit()
+        await db.refresh(new_order)
+
+        order_items = [models.OrderItem(
+            order_id=new_order.id,
+            movie_id=item.movie_id,
+            price_at_order=item.movie.price
+        ) for item in user_items]
+
+        if order_items:
+            db.add_all(order_items)
+            await db.commit()
+
+        return new_order
+    except Exception as e:
+        await db.rollback()
+        raise e
+
+
+async def order_confirm(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        order_id: int
+) -> OrderDoesNotExistError | dict[str, str]:
+    result_order = await db.execute(select(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.user_profile_id == user_profile.id)
+    )
+    order = result_order.scalar_one_or_none()
+
+    if not order:
+        raise OrderDoesNotExistError("Order by provided id does not exists")
+
+    ### LOGIC STRIPE
+    return {"detail": "redirect_to_stripe_url"}
+
+
+async def order_refuse(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        order_id: int
+) -> dict[str, str] | Exception | OrderDoesNotExistError:
+
+    result_order = await db.execute(select(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.user_profile_id == user_profile.id
+        )
+    )
+    order_to_delete = result_order.scalar_one_or_none()
+
+    if not order_to_delete:
+        raise OrderDoesNotExistError("Order by py provided id does not exists")
+    try:
+        await db.delete(order_to_delete)
+        await db.commit()
+        return {"detail": "Order was successfully deleted."}
+    except Exception as e:
+        await db.rollback()
+        raise e
+
+
+async def admin_users_order_list(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        search_by_user_email: str = None,
+        filter_by_date: datetime = None,
+        filter_by_status: str = None,
+        limit: int = 20,
+        skip: int = 0
+) -> Sequence[models.Order] | UserDontHavePermissionError:
+
+    if user_profile.user.user_group.name == models.UserGroupEnum.user:
+        raise UserDontHavePermissionError("User dont have permissions to visit this page")
+
+    query = select(models.Order)
+
+    if search_by_user_email:
+        query = query.join(
+            models.Order.user_profile
+        ).filter(models.UserProfile.user.email.ilike(f"%{search_by_user_email}%"))
+
+    if filter_by_date:
+        query = query.filter(models.Order.created_at >= filter_by_date)
+
+    if filter_by_status and (
+            filter_by_status == models.OrderStatusEnum.pending
+            or filter_by_status == models.OrderStatusEnum.canceled
+            or filter_by_status == models.OrderStatusEnum.paid
+    ):
+        query = query.filter(models.Order.status == filter_by_status).offset(skip).limit(limit)
+    query = query.options(
+        joinedload(models.Order.user_profile).options(
+            joinedload(models.UserProfile.user)
+        ),
+        selectinload(models.Order.order_items).options(
+            joinedload(models.OrderItem.movie).options(
+                selectinload(models.Movie.genres),
+                selectinload(models.Movie.stars),
+                selectinload(models.Movie.directors)
+            )
+        )
+    )
+    result_orders = await db.execute(query)
+    orders = result_orders.scalars().all()
+
+    return {
+        "orders": orders,
+        "offset": skip,
+        "limit": limit,
+        "total_items": len(orders)
+    }
