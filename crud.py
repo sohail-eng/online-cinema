@@ -956,3 +956,33 @@ async def order_list(
     total_items = len(all_orders)
 
     return {"all_orders": all_orders, "total_items": total_items}
+
+
+async def order_detail(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        order_id: int
+) -> models.Order | OrderDoesNotExistError:
+
+    result_order = await db.execute(select(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.user_profile_id == user_profile.id).options(
+            joinedload(models.Order.user_profile).options(
+                joinedload(models.UserProfile.user)
+            ),
+            selectinload(models.Order.order_items).options(
+                joinedload(models.OrderItem.movie).options(
+                    selectinload(models.Movie.genres),
+                    selectinload(models.Movie.directors),
+                    selectinload(models.Movie.stars)
+                )
+            )
+
+        )
+    )
+    order = result_order.scalar_one_or_none()
+
+    if not order:
+        raise OrderDoesNotExistError("Order was not found")
+
+    return order
