@@ -77,3 +77,27 @@ async def cart_list_endpoint(
     )
 
 
+
+@router.get("/cart/purchased_items/", response_model=schemas.CartPurchasedReadSchema)
+async def cart_purchased_items_endpoint(
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        search_by_book_name: str = None
+) -> schemas.CartPurchasedReadSchema:
+
+    purchased_cart = await crud.cart_purchased_items(
+        db=db,
+        user_profile=user.user_profile,
+        search_by_book_name=search_by_book_name
+    )
+
+    if not isinstance(purchased_cart, dict):
+        raise SomethingWentWrongError
+
+    validated_items = [schemas.CartItemsReadSchema.model_validate(item) for item in purchased_cart.get("cart_items")]
+
+    return schemas.CartPurchasedReadSchema(
+        cart_id=purchased_cart.get("cart_id", None),
+        cart_items=validated_items,
+        user_profile=user.user_profile
+    )
