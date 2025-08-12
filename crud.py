@@ -1053,3 +1053,26 @@ async def order_confirm(
     ### LOGIC STRIPE
     return {"detail": "redirect_to_stripe_url"}
 
+
+async def order_refuse(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        order_id: int
+) -> dict[str, str] | Exception | OrderDoesNotExistError:
+
+    result_order = await db.execute(select(models.Order).filter(
+        models.Order.id == order_id,
+        models.Order.user_profile_id == user_profile.id
+        )
+    )
+    order_to_delete = result_order.scalar_one_or_none()
+
+    if not order_to_delete:
+        raise OrderDoesNotExistError("Order by py provided id does not exists")
+    try:
+        await db.delete(order_to_delete)
+        await db.commit()
+        return {"detail": "Order was successfully deleted."}
+    except Exception as e:
+        await db.rollback()
+        raise e
