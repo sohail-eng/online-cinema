@@ -65,6 +65,7 @@ class UserProfile(Base):
     movie_comment_likes = relationship("MovieCommentLike", back_populates="user_profile")
     movie_rate_in_stars = relationship("MovieStar", back_populates="user_profile")
     cart = relationship("Cart", back_populates="user_profile")
+    order = relationship("Order", back_populates="user_profile")
 
 
 class ActivationToken(Base):
@@ -337,7 +338,13 @@ class CartItem(Base):
     cart_id = Column(Integer, ForeignKey("carts.id", ondelete="CASCADE"), nullable=False)
     movie_id = Column(Integer, ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
     is_paid = Column(Boolean, default=False)
-    added_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+    added_at = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp())
 
     cart = relationship("Cart", back_populates="cart_items")
     movie = relationship("Movie", back_populates="cart_items")
+
+
+class OrderStatusEnum(str, Enum):
+    pending = "PENDING"
+    paid = "PAID"
+    canceled = "CANCELED"
