@@ -812,3 +812,52 @@ async def cart_items_list(
         "cart_items": cart.cart_items,
         "total_price": total_price or 0
     }
+
+
+async def cart_purchased_items(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        search_by_book_name: str = None
+) -> dict[str, int | None | Any]:
+
+    if not search_by_book_name:
+        query = select(models.Cart).filter(
+            models.Cart.user_profile_id == user_profile.id,
+            models.Cart.cart_items.has(
+                models.CartItem.is_paid == True
+            )
+        ).options(
+            selectinload(models.Cart.cart_items).options(
+                joinedload(models.CartItem.movie).options(
+                    selectinload(models.Movie.genres),
+                    selectinload(models.Movie.stars),
+                    selectinload(models.Movie.directors),
+                    joinedload(models.Movie.certification)
+                ),
+            )
+        )
+    else:
+        query = select(models.Cart).filter(
+            models.Cart.user_profile_id == user_profile.id,
+            models.Cart.cart_items.has(
+                models.CartItem.movie.has(
+                    models.Movie.name.icontains(search_by_book_name)
+                ),
+                models.CartItem.is_paid == True
+            )).options(
+            selectinload(models.Cart.cart_items).options(
+                joinedload(models.CartItem.movie).options(
+                    selectinload(models.Movie.genres),
+                    selectinload(models.Movie.stars),
+                    selectinload(models.Movie.directors),
+                    joinedload(models.Movie.certification)
+                ),
+            )
+        )
+
+    result_cart = await db.execute(query)
+    cart = result_cart.scalar_one_or_none()
+    return {
+        "cart_id": cart.id,
+        "cart_items": cart.cart_items
+    }
