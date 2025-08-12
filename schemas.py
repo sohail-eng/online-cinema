@@ -4,8 +4,10 @@ from enum import Enum
 from typing import Optional, List
 
 import pydantic
-from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, model_validator, Field
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict, model_validator, Field, computed_field
 from pydantic import UUID4
+
+import models
 
 
 class TokenPayload(BaseModel):
@@ -209,6 +211,17 @@ class MovieBase(BaseModel):
     gross: Optional[float] = None
     description: str
     price: Optional[Decimal] = None
+
+
+class MovieOrderItemView(MovieBase):
+    genres: List[GenreSchema]
+    uuid: UUID4
+    stars: List[StarsSchema]
+    directors: List[DirectorsSchema]
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
 
 
 class MovieCreateSchema(MovieBase):
