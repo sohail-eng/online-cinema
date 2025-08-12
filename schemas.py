@@ -337,3 +337,10 @@ class CartReadSchema(CartPurchasedReadSchema):
     #cutom
     total_price: Optional[Decimal] = None
 
+
+class AdminCartsSchema(BaseModel):
+    cart_id: int
+    user_profile: UserProfileRead
+
+    #cutom
+    count_of_all_items_in_cart: Optional[int] = 0
