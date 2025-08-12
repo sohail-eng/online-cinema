@@ -401,3 +401,13 @@ class OrdersPaginatedSchema(BaseModel):
     total_items: Optional[int] = None
 
     items: List[OrderListSchema]
+
+
+class OrderDetailSchema(OrderBaseSchema):
+    user_profile: UserProfileRead
+    order_items: List[OrderItemDetailSchema]
+
+    @computed_field
+    def order_items_count(self):
+        return len(self.order_items)
+
