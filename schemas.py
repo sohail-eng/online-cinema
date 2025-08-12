@@ -411,3 +411,10 @@ class OrderDetailSchema(OrderBaseSchema):
     def order_items_count(self):
         return len(self.order_items)
 
+
+class OrderDetailPaginatedSchema(BaseModel):
+    offset: Optional[int] = None
+    limit: Optional[int] = None
+    total_items: Optional[int] = None
+
+    orders: OrderDetailSchema
