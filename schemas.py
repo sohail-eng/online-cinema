@@ -203,6 +203,7 @@ class MovieBase(BaseModel):
     year: int
     time: int
     imdb: float
+    image: Optional[str] = None
     votes: int
     meta_score: Optional[float] = None
     gross: Optional[float] = None
@@ -277,6 +278,7 @@ class MovieUpdateScheme(BaseModel):
     year: Optional[int] = None
     time: Optional[int] = None
     imdb: Optional[float] = None
+    image: Optional[str] = None
     meta_score: Optional[float] = None
     gross: Optional[float] = None
     description: Optional[str] = None
@@ -286,3 +288,59 @@ class MovieUpdateScheme(BaseModel):
     genre_ids: Optional[List[int]] = None
     star_ids: Optional[List[int]] = None
     director_ids: Optional[List[int]] = None
+
+
+class MovieCartRead(BaseModel):
+    id: int
+    uuid: UUID4
+    name: str
+    year: int
+    time: int
+    price: Decimal
+    image: str
+
+    genres: List[GenreSchema]
+    stars: List[StarsSchema]
+    directors: List[DirectorsSchema]
+
+# ----------------------------------------------- CART
+
+# users cart
+class CartItemsReadSchema(BaseModel):
+     id: int
+     cart_id: int
+     movie_id: int
+     added_at: int
+     is_paid: bool
+
+     movie: MovieCartRead
+
+     model_config = ConfigDict(
+         from_attributes=True
+     )
+
+
+class CartPurchasedReadSchema(BaseModel):
+    cart_id: int
+    user_profile: UserProfileRead
+    cart_items: Optional[List[CartItemsReadSchema]] = []
+
+    #cutom
+    count_of_all_items_in_cart: Optional[int] = 0
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
+class CartReadSchema(CartPurchasedReadSchema):
+    #cutom
+    total_price: Optional[Decimal] = None
+
+
+class AdminCartsSchema(BaseModel):
+    cart_id: int
+    user_profile: UserProfileRead
+
+    #cutom
+    count_of_all_items_in_cart: Optional[int] = 0

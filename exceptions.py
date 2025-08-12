@@ -9,3 +9,9 @@ class UserDontHavePermissionError(Exception):
 
 class SomethingWentWrongError(Exception):
     pass
+
+class MovieAlreadyIsPurchasedOrInCartError(Exception):
+    pass
+
+class CartNotExistError(Exception):
+    pass

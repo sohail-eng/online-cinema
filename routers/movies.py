@@ -10,13 +10,11 @@ import models
 import schemas
 from crud import get_movie_by_id
 from exceptions import SomethingWentWrongError
+from models import MovieCommentReply, MovieComment, Movie
 from schemas import MovieReadDetail
 
 router = APIRouter()
 
-@router.get("/movies")
-async def movies_list():
-    return {"message": "All Movies"}
 
 @router.get("/movies/", response_model=List[schemas.MovieRead])
 async def movies_list_endpoint(
@@ -95,8 +93,10 @@ async def movie_delete_endpoint(
     if not isinstance(deleted_movie, dict):
         raise SomethingWentWrongError
 
-    return JSONResponse(content=f"{deleted_movie.get('detail')}", status_code=status.HTTP_200_OK)
+    if deleted_movie.get("detail") == "Movie was successfully deleted.":
+        return JSONResponse(content=f"{deleted_movie.get('detail')}", status_code=status.HTTP_200_OK)
 
+    return JSONResponse(content=f"{deleted_movie.get('detail')}", status_code=status.HTTP_403_FORBIDDEN)
 
 @router.post("/movies/{movie_id}/update/", response_model=schemas.MovieRead)
 async def movie_update_endpoint(
@@ -118,7 +118,7 @@ async def movie_create_endpoint(
         db: dependencies.DpGetDB,
         user: dependencies.GetCurrentUser,
         data: schemas.MovieCreateSchema
-):
+) -> Movie:
     created_movie = await crud.movie_create(db=db, user_profile=user.user_profile, data=data)
 
     if not isinstance(created_movie, models.Movie):
@@ -133,7 +133,7 @@ async def movie_create_comment_endpoint(
         db: dependencies.DpGetDB,
         user: dependencies.GetCurrentUser,
         data: schemas.CommentCreateSchema
-):
+) -> MovieComment:
     created_comment = await crud.create_comment(
         movie_id=movie_id,
         db=db,
@@ -152,7 +152,7 @@ async def movie_delete_comment_endpoint(
         comment_id: int,
         db: dependencies.DpGetDB,
         user: dependencies.GetCurrentUser
-):
+) -> JSONResponse:
     deleted_comment = await crud.delete_comment(comment_id=comment_id, db=db, user_profile=user.user_profile)
 
     if not isinstance(deleted_comment, dict):
@@ -167,7 +167,7 @@ async def movie_comment_reply_endpoint(
         db: dependencies.DpGetDB,
         user: dependencies.GetCurrentUser,
         data: schemas.MovieCommentReplyCreate
-):
+) -> MovieCommentReply:
     created_reply = await crud.reply_comment(
         comment_id=comment_id,
         db=db,
@@ -185,7 +185,7 @@ async def movie_comment_like_or_delete_like_if_exists_endpoint(
         comment_id: int,
         db: dependencies.DpGetDB,
         user: dependencies.GetCurrentUser
-):
+) -> JSONResponse:
     like_or_delete_like = await crud.like_comment_or_delete_if_exists(
         comment_id=comment_id,
         db=db,
@@ -203,7 +203,7 @@ async def movie_comment_reply_like_or_delete_like_if_exists_endpoint(
         reply_id: int,
         db: dependencies.DpGetDB,
         user: dependencies.GetCurrentUser
-):
+) -> JSONResponse:
     comment_like_or_unlike = await crud.like_comment_reply_or_delete_if_exists(
         comment_reply_id=reply_id,
         db=db,
@@ -221,7 +221,7 @@ async def movie_add_to_favorite_or_delete_if_exists_endpoint(
         movie_id: int,
         user: dependencies.GetCurrentUser,
         db: dependencies.DpGetDB
-):
+) -> JSONResponse:
     add_to_favorite_or_delete = await crud.add_movie_to_favorite_or_delete_if_exists(
         movie_id=movie_id,
         user_profile=user.user_profile,
@@ -240,7 +240,7 @@ async def movie_like_or_dislike_or_delete_like_or_dislike_endpoint(
         db: dependencies.DpGetDB,
         user: dependencies.GetCurrentUser,
         data: schemas.UserMovieRating
-):
+) -> JSONResponse:
     like_or_dislike_or_delete = await crud.like_or_dislike_movie_and_delete_if_exists(
         movie_id=movie_id,
         user_profile=user.user_profile,
@@ -260,7 +260,7 @@ async def movie_rate_from_sero_to_ten_endpoint(
         db: dependencies.DpGetDB,
         user: dependencies.GetCurrentUser,
         data: schemas.MovieRatingFromZeroToTen
-):
+) -> JSONResponse:
     rate_movie = await crud.rate_movie_from_0_to_10_or_delete_rate_if_exists(
         db=db,
         movie_id=movie_id,

@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Sequence, Any
 
 import aiofiles
 from fastapi import BackgroundTasks
@@ -10,13 +10,18 @@ from sqlalchemy.sql.functions import func
 import models
 import schemas
 from email_service.email_sender import send_email
-from exceptions import CommentNotFoundError, MovieNotFoundError, UserDontHavePermissionError, SomethingWentWrongError
+from exceptions import CommentNotFoundError, MovieNotFoundError, UserDontHavePermissionError, SomethingWentWrongError, \
+    MovieAlreadyIsPurchasedOrInCartError, CartNotExistError
+from models import CartItem, Cart
 
 
 async def get_user_by_email(email, db: AsyncSession) -> models.User | None:
     result = await db.execute(select(models.User).filter(models.User.email == email).options(
         joinedload(models.User.user_group),
-        joinedload(models.User.user_profile)
+        joinedload(models.User.user_profile).options(
+            joinedload(models.UserProfile.cart).options(selectinload(models.Cart.cart_items)
+                                                        )
+        ),
     ))
     user = result.scalar_one_or_none()
     return user
@@ -99,6 +104,7 @@ async def create_comment(
         AsyncSession, data: schemas.CommentCreateSchema,
         user_profile: models.UserProfile
 ) -> MovieNotFoundError | models.MovieComment | Exception:
+
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
@@ -124,6 +130,7 @@ async def delete_comment(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> CommentNotFoundError | dict[str, str] | Exception:
+
     if user_profile.user.user_group.name == models.UserGroupEnum.user:
         raise UserDontHavePermissionError("Permissions for deleting have Admins and Moderators, not regular Users")
 
@@ -149,11 +156,12 @@ async def reply_comment(
         data: schemas.MovieCommentReplyCreate,
         background_task: BackgroundTasks
 ) -> Exception | CommentNotFoundError | models.MovieCommentReply:
+
     result_comment = await db.execute(select(models.MovieComment).filter(
         models.MovieComment.id == comment_id).options(
         joinedload(models.MovieComment.user_profile),
         joinedload(models.UserProfile.user)
-        )
+    )
     )
     comment = result_comment.scalar_one_or_none()
 
@@ -173,7 +181,8 @@ async def reply_comment(
         async with aiofiles.open("email_service/email_templates/reply_comment.html", "r") as f:
             reply_comment_html = await f.read()
 
-        result_comment_movie_name = await db.execute(select(models.Movie.name).filter(models.Movie.id == comment.movie_id))
+        result_comment_movie_name = await db.execute(
+            select(models.Movie.name).filter(models.Movie.id == comment.movie_id))
         comment_movie_name = result_comment_movie_name.scalar_one_or_none()
 
         recipient_name = (reply_comment_creator.first_name + " " + reply_comment_creator.last_name) if (
@@ -185,7 +194,7 @@ async def reply_comment(
         ) else comment.user_profile.user.email
 
         reply_comment_html = reply_comment_html.replace(
-        "{{recipient_name}}", recipient_name
+            "{{recipient_name}}", recipient_name
         ).replace(
             "{{movie_title}}", comment_movie_name or "Without Name"
         ).replace(
@@ -223,6 +232,7 @@ async def like_comment_or_delete_if_exists(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> Exception | CommentNotFoundError | dict[str, str]:
+
     result_comment = await db.execute(select(models.MovieComment).filter(
         models.MovieComment.id == comment_id)
     )
@@ -262,6 +272,7 @@ async def like_comment_reply_or_delete_if_exists(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> Exception | CommentNotFoundError | dict[str, str]:
+
     result_comment_reply = await db.execute(select(models.MovieCommentReply).filter(
         models.MovieCommentReply.id == comment_reply_id)
     )
@@ -301,6 +312,7 @@ async def add_movie_to_favorite_or_delete_if_exists(
         user_profile: models.UserProfile,
         db: AsyncSession
 ) -> MovieNotFoundError | Exception | dict[str, str]:
+
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
@@ -586,14 +598,20 @@ async def delete_movie(
 
     if not movie:
         raise MovieNotFoundError("Movie was not found")
-    try:
-        await db.delete(movie)
-        await db.commit()
-        return {"detail": "Movie was successfully deleted."}
-    except Exception as e:
-        await db.rollback()
-        raise e
 
+    result_movie_in_users_cart = await db.execute(select(models.CartItem.id).filter(models.CartItem.movie_id == movie.id))
+    movie_in_users_cart = result_movie_in_users_cart.scalars().all()
+
+    if not movie_in_users_cart:
+        try:
+            await db.delete(movie)
+            await db.commit()
+            return {"detail": "Movie was successfully deleted."}
+        except Exception as e:
+            await db.rollback()
+            raise e
+    else:
+        return {"detail": "You can not delete the movie because it is in user's cart"}
 
 async def update_movie(
         movie_id: int,
@@ -633,3 +651,280 @@ async def update_movie(
     except Exception as e:
         await db.rollback()
         raise e
+
+
+# ----------------------------CART------------------
+
+
+async def cart_add_item(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        movie_id: int,
+        user_cart_id: int = None,
+) -> MovieNotFoundError | UserDontHavePermissionError | dict[str, str]:
+
+    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
+    movie = result_movie.scalar_one_or_none()
+
+    if not movie:
+        raise MovieNotFoundError("Movie was not found")
+
+    if not user_profile.cart:
+        new_cart = models.Cart(user_profile_id=user_profile.id)
+        db.add(new_cart)
+        await db.commit()
+        await db.refresh(new_cart)
+
+    try:
+        if user_profile.user.user_group.name == models.UserGroupEnum.user:
+            cart = user_profile.cart
+        else:
+            if user_profile.user.user_group.name == models.UserGroupEnum.user:
+                raise UserDontHavePermissionError("User have not permissions to add items to other user's carts")
+
+            result_user_cart = await db.execute(select(models.Cart).filter(models.Cart.id == user_cart_id))
+            cart = result_user_cart.scalar_one_or_none()
+
+        all_movies_in_users_cart = [c.movie_id for c in cart.cart_items]
+        result_all_purchased_movies_ids = await db.execute(select(models.CartItem.id).filter(
+            models.CartItem.is_paid == True,
+            models.CartItem.cart.has(
+                models.Cart.user_profile == cart.user_profile_id
+                )
+            )
+        )
+        all_purchased_movies_ids = result_all_purchased_movies_ids.scalars().all()
+
+        if movie.id in all_movies_in_users_cart or movie.id in all_purchased_movies_ids:
+            raise MovieAlreadyIsPurchasedOrInCartError("Movie is already purchased or in user's cart")
+
+        new_cart_item = CartItem(cart_id=cart.id, movie_id=movie.id)
+        db.add(new_cart_item)
+        await db.commit()
+        await db.refresh(new_cart_item)
+        return {"detail": "Item was successfully added"}
+
+    except Exception as e:
+        await db.rollback()
+        raise e
+
+
+async def cart_remove_item(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        movie_id: int,
+        user_cart_id: int = None
+) -> Exception | MovieNotFoundError | dict[str, str]:
+
+    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
+    movie = result_movie.scalar_one_or_none()
+
+    if not movie:
+        raise MovieNotFoundError("Movie was not found")
+
+    if not user_cart_id:
+        result_user_cart_item = await db.execute(select(models.CartItem).filter(
+            models.CartItem.movie_id == movie.id, models.CartItem.cart.has(
+            models.Cart.user_profile_id == user_profile.id)
+            )
+        )
+    else:
+        if user_profile.user.user_group.name == models.UserGroupEnum.user:
+            raise UserDontHavePermissionError("User have not permissions to delete items from other user's carts")
+        result_user_cart_item = await db.execute(select(models.CartItem).filter(
+            models.CartItem.movie_id == movie.id, models.CartItem.cart.has(
+            models.Cart.id == user_cart_id)
+            )
+        )
+
+    user_cart_item = result_user_cart_item.scalar_one_or_none()
+
+    if not user_cart_item:
+        raise SomethingWentWrongError("User has not this movie in cart")
+
+    try:
+        await db.delete(user_cart_item)
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise e
+
+    return {"detail": "Movie was successfully deleted from user's cart"}
+
+
+async def cart_items_list(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        search_by_book_name: str = None
+) -> dict[str, int | None | Cart | Any]:
+
+    if not search_by_book_name:
+        query = select(models.Cart).filter(
+            models.Cart.user_profile_id == user_profile.id,
+            models.Cart.cart_items.has(
+                models.CartItem.is_paid != True
+            )
+        ).options(
+            selectinload(models.Cart.cart_items).options(
+                joinedload(models.CartItem.movie).options(
+                    selectinload(models.Movie.genres),
+                    selectinload(models.Movie.stars),
+                    selectinload(models.Movie.directors),
+                    joinedload(models.Movie.certification)
+                ),
+            )
+        )
+    else:
+        query = select(models.Cart).filter(
+            models.Cart.user_profile_id == user_profile.id,
+            models.Cart.cart_items.has(
+                models.CartItem.movie.has(
+                    models.Movie.name.icontains(search_by_book_name)
+                ),
+                models.CartItem.is_paid != True
+            )).options(
+            selectinload(models.Cart.cart_items).options(
+                joinedload(models.CartItem.movie).options(
+                    selectinload(models.Movie.genres),
+                    selectinload(models.Movie.stars),
+                    selectinload(models.Movie.directors),
+                    joinedload(models.Movie.certification)
+                ),
+            )
+        )
+
+    result_cart = await db.execute(query)
+    cart = result_cart.scalar_one_or_none()
+
+    result_total_price = await db.execute(
+        select(func.sum(
+            models.Movie.price)
+        ).select_from(
+            models.CartItem
+        ).join(
+            models.CartItem.cart
+        ).join(
+            models.CartItem.movie
+        ).filter(
+            models.Cart.user_profile_id == user_profile.id
+        )
+    )
+    total_price = result_total_price.scalar_one_or_none()
+
+    return {
+        "cart_id": cart.id,
+        "cart_items": cart.cart_items,
+        "total_price": total_price or 0
+    }
+
+
+async def cart_purchased_items(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        search_by_book_name: str = None
+) -> dict[str, int | None | Any]:
+
+    if not search_by_book_name:
+        query = select(models.Cart).filter(
+            models.Cart.user_profile_id == user_profile.id,
+            models.Cart.cart_items.has(
+                models.CartItem.is_paid == True
+            )
+        ).options(
+            selectinload(models.Cart.cart_items).options(
+                joinedload(models.CartItem.movie).options(
+                    selectinload(models.Movie.genres),
+                    selectinload(models.Movie.stars),
+                    selectinload(models.Movie.directors),
+                    joinedload(models.Movie.certification)
+                ),
+            )
+        )
+    else:
+        query = select(models.Cart).filter(
+            models.Cart.user_profile_id == user_profile.id,
+            models.Cart.cart_items.has(
+                models.CartItem.movie.has(
+                    models.Movie.name.icontains(search_by_book_name)
+                ),
+                models.CartItem.is_paid == True
+            )).options(
+            selectinload(models.Cart.cart_items).options(
+                joinedload(models.CartItem.movie).options(
+                    selectinload(models.Movie.genres),
+                    selectinload(models.Movie.stars),
+                    selectinload(models.Movie.directors),
+                    joinedload(models.Movie.certification)
+                ),
+            )
+        )
+
+    result_cart = await db.execute(query)
+    cart = result_cart.scalar_one_or_none()
+    return {
+        "cart_id": cart.id,
+        "cart_items": cart.cart_items
+    }
+
+
+async def admin_carts_list(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        search_by_user_email: str = None,
+        skip: int = 0,
+        limit: int = 20
+) -> Sequence[models.Cart]:
+    if user_profile.user.user_group.name == models.UserGroupEnum.user:
+        raise UserDontHavePermissionError("Users have not permissions to visit this page.")
+
+    if search_by_user_email:
+        query = select(models.Cart).filter(
+            models.Cart.user_profile.has(
+                models.UserProfile.user.has(
+                    models.User.email == search_by_user_email
+                ))
+        ).options(
+            selectinload(models.Cart.cart_items),
+            joinedload(models.Cart.user_profile).options(
+                joinedload(models.UserProfile.user)
+            )
+        ).offset(skip=skip).limit(limit=limit)
+    else:
+        query = select(models.Cart).options(
+            selectinload(models.Cart.cart_items),
+            joinedload(models.Cart.user_profile).options(
+                joinedload(models.UserProfile.user)
+            )
+        ).offset(skip=skip).limit(limit=limit)
+
+    result_carts = await db.execute(query)
+    return result_carts.scalars().all()
+
+
+async def admin_user_cart_detail(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        user_cart_id: int,
+):
+    if user_profile.user.user_group == models.UserGroupEnum.user:
+        raise UserDontHavePermissionError
+
+    result_cart = await db.execute(select(models.Cart).filter(models.Cart.id == user_cart_id).options(
+        selectinload(models.Cart.cart_items).options(
+            joinedload(models.CartItem.movie).options(
+                selectinload(models.Movie.genres),
+                selectinload(models.Movie.stars),
+                selectinload(models.Movie.directors),
+                joinedload(models.Movie.certification)
+            ),
+        ),
+        joinedload(models.Cart.user_profile).options(
+            joinedload(models.UserProfile.user)
+        )
+    ))
+    cart = result_cart.scalar_one_or_none()
+
+    if not cart:
+        raise CartNotExistError("Cart by provided id does not exists")
+
+    return cart
