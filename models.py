@@ -318,3 +318,8 @@ class Cart(Base):
 
     user_profile = relationship("UserProfile", back_populates="cart")
     cart_items = relationship("CartItem", back_populates="cart")
+
+    @property
+    def count_of_all_items_in_cart(self):
+        return len(self.cart_items)
+
