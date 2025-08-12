@@ -647,3 +647,59 @@ async def update_movie(
     except Exception as e:
         await db.rollback()
         raise e
+
+
+# ----------------------------CART------------------
+
+
+async def cart_add_item(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        movie_id: int,
+        user_cart_id: int = None,
+) -> MovieNotFoundError | UserDontHavePermissionError | dict[str, str]:
+
+    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
+    movie = result_movie.scalar_one_or_none()
+
+    if not movie:
+        raise MovieNotFoundError("Movie was not found")
+
+    if not user_profile.cart:
+        new_cart = models.Cart(user_profile_id=user_profile.id)
+        db.add(new_cart)
+        await db.commit()
+        await db.refresh(new_cart)
+
+    try:
+        if user_profile.user.user_group.name == models.UserGroupEnum.user:
+            cart = user_profile.cart
+        else:
+            if user_profile.user.user_group.name == models.UserGroupEnum.user:
+                raise UserDontHavePermissionError("User have not permissions to add items to other user's carts")
+
+            result_user_cart = await db.execute(select(models.Cart).filter(models.Cart.id == user_cart_id))
+            cart = result_user_cart.scalar_one_or_none()
+
+        all_movies_in_users_cart = [c.movie_id for c in cart.cart_items]
+        result_all_purchased_movies_ids = await db.execute(select(models.CartItem.id).filter(
+            models.CartItem.is_paid == True,
+            models.CartItem.cart.has(
+                models.Cart.user_profile == cart.user_profile_id
+                )
+            )
+        )
+        all_purchased_movies_ids = result_all_purchased_movies_ids.scalars().all()
+
+        if movie.id in all_movies_in_users_cart or movie.id in all_purchased_movies_ids:
+            raise MovieAlreadyIsPurchasedOrInCartError("Movie is already purchased or in user's cart")
+
+        new_cart_item = CartItem(cart_id=cart.id, movie_id=movie.id)
+        db.add(new_cart_item)
+        await db.commit()
+        await db.refresh(new_cart_item)
+        return {"detail": "Item was successfully added"}
+
+    except Exception as e:
+        await db.rollback()
+        raise e
