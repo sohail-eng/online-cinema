@@ -93,3 +93,24 @@ async def order_confirm_endpoint(
     )
 
 
+@router.delete("/orders/{order_id}/refuse/")
+async def order_refuse_endpoint(
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        order_id: int
+) -> JSONResponse:
+
+    order_refuse = await crud.order_refuse(
+        db=db,
+        user_profile=user.user_profile,
+        order_id=order_id
+    )
+    if not isinstance(order_refuse, dict):
+        raise SomethingWentWrongError
+
+    return JSONResponse(
+        content=f"{order_refuse.get('detail')}",
+        status_code=status.HTTP_200_OK
+    )
+
+
