@@ -703,3 +703,46 @@ async def cart_add_item(
     except Exception as e:
         await db.rollback()
         raise e
+
+
+async def cart_remove_item(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        movie_id: int,
+        user_cart_id: int = None
+) -> Exception | MovieNotFoundError | dict[str, str]:
+
+    result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
+    movie = result_movie.scalar_one_or_none()
+
+    if not movie:
+        raise MovieNotFoundError("Movie was not found")
+
+    if not user_cart_id:
+        result_user_cart_item = await db.execute(select(models.CartItem).filter(
+            models.CartItem.movie_id == movie.id, models.CartItem.cart.has(
+            models.Cart.user_profile_id == user_profile.id)
+            )
+        )
+    else:
+        if user_profile.user.user_group.name == models.UserGroupEnum.user:
+            raise UserDontHavePermissionError("User have not permissions to delete items from other user's carts")
+        result_user_cart_item = await db.execute(select(models.CartItem).filter(
+            models.CartItem.movie_id == movie.id, models.CartItem.cart.has(
+            models.Cart.id == user_cart_id)
+            )
+        )
+
+    user_cart_item = result_user_cart_item.scalar_one_or_none()
+
+    if not user_cart_item:
+        raise SomethingWentWrongError("User has not this movie in cart")
+
+    try:
+        await db.delete(user_cart_item)
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise e
+
+    return {"detail": "Movie was successfully deleted from user's cart"}
