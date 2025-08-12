@@ -72,3 +72,24 @@ async def create_order_endpoint(
     )
 
 
+@router.post("/orders/{order_id}/confirm/")
+async def order_confirm_endpoint(
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        order_id: int
+) -> RedirectResponse:
+
+    order_confirm = await crud.order_confirm(
+        db=db,
+        user_profile=user.user_profile,
+        order_id=order_id
+    )
+    if not isinstance(order_confirm, dict):
+        raise SomethingWentWrongError
+
+    return RedirectResponse(
+        url=f"{order_confirm.get('redirect_to_stripe_url')}",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
