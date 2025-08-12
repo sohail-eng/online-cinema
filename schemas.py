@@ -357,3 +357,14 @@ class AdminCartsSchema(BaseModel):
 
     #cutom
     count_of_all_items_in_cart: Optional[int] = 0
+
+
+# -------------------- ORDER
+class OrderItemBaseSchema(BaseModel):
+    id: int
+    order_id: int
+    price_at_order: Decimal
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
