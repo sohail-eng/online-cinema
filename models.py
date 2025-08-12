@@ -362,3 +362,16 @@ class Order(Base):
     order_items = relationship("OrderItem", back_populates="order")
     user_profile = relationship("UserProfile", back_populates="order")
     payments = relationship("Payment", back_populates="order")
+
+
+class OrderItem(Base):
+    __tablename__ = "order_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    order_id = Column(Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    movie_id = Column(Integer, ForeignKey("movies.id"), nullable=False)
+    price_at_order = Column(DECIMAL(10, 2))
+
+    order = relationship("Order", back_populates="order_items")
+    movie = relationship("Movie", back_populates="order_items")
+    payment_items = relationship("PaymentItem", back_populates="order_item")
