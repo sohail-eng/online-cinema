@@ -318,3 +318,17 @@ class CartItemsReadSchema(BaseModel):
      model_config = ConfigDict(
          from_attributes=True
      )
+
+
+class CartPurchasedReadSchema(BaseModel):
+    cart_id: int
+    user_profile: UserProfileRead
+    cart_items: Optional[List[CartItemsReadSchema]] = []
+
+    #cutom
+    count_of_all_items_in_cart: Optional[int] = 0
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
