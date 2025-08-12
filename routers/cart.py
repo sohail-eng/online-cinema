@@ -101,3 +101,26 @@ async def cart_purchased_items_endpoint(
         cart_items=validated_items,
         user_profile=user.user_profile
     )
+
+
+@router.get("/carts/", response_model=List[schemas.AdminCartsSchema])
+async def admin_carts_list_endpoint(
+        db: dependencies.DpGetDB,
+        user: dependencies.GetCurrentUser,
+        skip: int = 0,
+        limit: int = 20,
+        search_user_email: str = None
+) -> List[models.Cart]:
+
+    carts_list = await crud.admin_carts_list(
+        db=db,
+        user_profile=user.user_profile,
+        search_by_user_email=search_user_email,
+        skip=skip,
+        limit=limit
+    )
+
+    if not isinstance(carts_list, list):
+        raise SomethingWentWrongError
+
+    return carts_list
