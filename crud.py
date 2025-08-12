@@ -156,6 +156,7 @@ async def reply_comment(
         data: schemas.MovieCommentReplyCreate,
         background_task: BackgroundTasks
 ) -> Exception | CommentNotFoundError | models.MovieCommentReply:
+
     result_comment = await db.execute(select(models.MovieComment).filter(
         models.MovieComment.id == comment_id).options(
         joinedload(models.MovieComment.user_profile),
@@ -231,6 +232,7 @@ async def like_comment_or_delete_if_exists(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> Exception | CommentNotFoundError | dict[str, str]:
+
     result_comment = await db.execute(select(models.MovieComment).filter(
         models.MovieComment.id == comment_id)
     )
@@ -270,6 +272,7 @@ async def like_comment_reply_or_delete_if_exists(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> Exception | CommentNotFoundError | dict[str, str]:
+
     result_comment_reply = await db.execute(select(models.MovieCommentReply).filter(
         models.MovieCommentReply.id == comment_reply_id)
     )
@@ -309,6 +312,7 @@ async def add_movie_to_favorite_or_delete_if_exists(
         user_profile: models.UserProfile,
         db: AsyncSession
 ) -> MovieNotFoundError | Exception | dict[str, str]:
+
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
@@ -861,3 +865,38 @@ async def cart_purchased_items(
         "cart_id": cart.id,
         "cart_items": cart.cart_items
     }
+
+
+async def admin_carts_list(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+        search_by_user_email: str = None,
+        skip: int = 0,
+        limit: int = 20
+) -> Sequence[models.Cart]:
+    if user_profile.user.user_group.name == models.UserGroupEnum.user:
+        raise UserDontHavePermissionError("Users have not permissions to visit this page.")
+
+    if search_by_user_email:
+        query = select(models.Cart).filter(
+            models.Cart.user_profile.has(
+                models.UserProfile.user.has(
+                    models.User.email == search_by_user_email
+                ))
+        ).options(
+            selectinload(models.Cart.cart_items),
+            joinedload(models.Cart.user_profile).options(
+                joinedload(models.UserProfile.user)
+            )
+        ).offset(skip=skip).limit(limit=limit)
+    else:
+        query = select(models.Cart).options(
+            selectinload(models.Cart.cart_items),
+            joinedload(models.Cart.user_profile).options(
+                joinedload(models.UserProfile.user)
+            )
+        ).offset(skip=skip).limit(limit=limit)
+
+    result_carts = await db.execute(query)
+    return result_carts.scalars().all()
+
