@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Sequence, Any
 
 import aiofiles
 from fastapi import BackgroundTasks
@@ -10,13 +10,18 @@ from sqlalchemy.sql.functions import func
 import models
 import schemas
 from email_service.email_sender import send_email
-from exceptions import CommentNotFoundError, MovieNotFoundError, UserDontHavePermissionError, SomethingWentWrongError
+from exceptions import CommentNotFoundError, MovieNotFoundError, UserDontHavePermissionError, SomethingWentWrongError, \
+    MovieAlreadyIsPurchasedOrInCartError, CartNotExistError
+from models import CartItem, Cart
 
 
 async def get_user_by_email(email, db: AsyncSession) -> models.User | None:
     result = await db.execute(select(models.User).filter(models.User.email == email).options(
         joinedload(models.User.user_group),
-        joinedload(models.User.user_profile)
+        joinedload(models.User.user_profile).options(
+            joinedload(models.UserProfile.cart).options(selectinload(models.Cart.cart_items)
+                                                        )
+        ),
     ))
     user = result.scalar_one_or_none()
     return user
@@ -99,6 +104,7 @@ async def create_comment(
         AsyncSession, data: schemas.CommentCreateSchema,
         user_profile: models.UserProfile
 ) -> MovieNotFoundError | models.MovieComment | Exception:
+
     result_movie = await db.execute(select(models.Movie).filter(models.Movie.id == movie_id))
     movie = result_movie.scalar_one_or_none()
 
@@ -124,6 +130,7 @@ async def delete_comment(
         db: AsyncSession,
         user_profile: models.UserProfile
 ) -> CommentNotFoundError | dict[str, str] | Exception:
+
     if user_profile.user.user_group.name == models.UserGroupEnum.user:
         raise UserDontHavePermissionError("Permissions for deleting have Admins and Moderators, not regular Users")
 
@@ -153,7 +160,7 @@ async def reply_comment(
         models.MovieComment.id == comment_id).options(
         joinedload(models.MovieComment.user_profile),
         joinedload(models.UserProfile.user)
-        )
+    )
     )
     comment = result_comment.scalar_one_or_none()
 
@@ -173,7 +180,8 @@ async def reply_comment(
         async with aiofiles.open("email_service/email_templates/reply_comment.html", "r") as f:
             reply_comment_html = await f.read()
 
-        result_comment_movie_name = await db.execute(select(models.Movie.name).filter(models.Movie.id == comment.movie_id))
+        result_comment_movie_name = await db.execute(
+            select(models.Movie.name).filter(models.Movie.id == comment.movie_id))
         comment_movie_name = result_comment_movie_name.scalar_one_or_none()
 
         recipient_name = (reply_comment_creator.first_name + " " + reply_comment_creator.last_name) if (
@@ -185,7 +193,7 @@ async def reply_comment(
         ) else comment.user_profile.user.email
 
         reply_comment_html = reply_comment_html.replace(
-        "{{recipient_name}}", recipient_name
+            "{{recipient_name}}", recipient_name
         ).replace(
             "{{movie_title}}", comment_movie_name or "Without Name"
         ).replace(
@@ -586,14 +594,20 @@ async def delete_movie(
 
     if not movie:
         raise MovieNotFoundError("Movie was not found")
-    try:
-        await db.delete(movie)
-        await db.commit()
-        return {"detail": "Movie was successfully deleted."}
-    except Exception as e:
-        await db.rollback()
-        raise e
 
+    result_movie_in_users_cart = await db.execute(select(models.CartItem.id).filter(models.CartItem.movie_id == movie.id))
+    movie_in_users_cart = result_movie_in_users_cart.scalars().all()
+
+    if not movie_in_users_cart:
+        try:
+            await db.delete(movie)
+            await db.commit()
+            return {"detail": "Movie was successfully deleted."}
+        except Exception as e:
+            await db.rollback()
+            raise e
+    else:
+        return {"detail": "You can not delete the movie because it is in user's cart"}
 
 async def update_movie(
         movie_id: int,
