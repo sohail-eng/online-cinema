@@ -986,3 +986,51 @@ async def order_detail(
         raise OrderDoesNotExistError("Order was not found")
 
     return order
+
+
+async def create_order(
+        db: AsyncSession,
+        user_profile: models.UserProfile,
+) -> models.Order | Exception:
+
+    result_user_items_price = await db.execute(
+        select(func.sum(models.Movie.price))
+        .select_from(models.CartItem)
+        .join(models.CartItem.movie)
+        .join(models.CartItem.cart)
+        .filter(models.Cart.user_profile_id == user_profile.id)
+    )
+    result_user_items = await db.execute(select(CartItem).filter(
+        models.CartItem.cart.has(
+            models.Cart.user_profile_id == user_profile.id,
+            ),
+        models.CartItem.is_paid == False
+        ).options(
+        joinedload(models.CartItem.movie)
+        )
+    )
+    user_items = result_user_items.scalars().all()
+    total_amount = result_user_items_price.scalar_one_or_none() or 0.00
+    try:
+        new_order = models.Order(
+            user_profile_id=user_profile.id,
+            total_amount=total_amount
+        )
+        db.add(new_order)
+        await db.commit()
+        await db.refresh(new_order)
+
+        order_items = [models.OrderItem(
+            order_id=new_order.id,
+            movie_id=item.movie_id,
+            price_at_order=item.movie.price
+        ) for item in user_items]
+
+        if order_items:
+            db.add_all(order_items)
+            await db.commit()
+
+        return new_order
+    except Exception as e:
+        await db.rollback()
+        raise e
