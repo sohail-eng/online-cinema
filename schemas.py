@@ -394,3 +394,10 @@ class OrderListSchema(OrderBaseSchema):
     @computed_field
     def order_items_count(self):
         return len(self.order_items)
+
+class OrdersPaginatedSchema(BaseModel):
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    total_items: Optional[int] = None
+
+    items: List[OrderListSchema]
