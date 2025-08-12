@@ -348,3 +348,17 @@ class OrderStatusEnum(str, Enum):
     pending = "PENDING"
     paid = "PAID"
     canceled = "CANCELED"
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_profile_id = Column(Integer, ForeignKey("user_profiles.id", ondelete="CASCADE"))
+    created_at = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp)
+    status = Column(SqlEnum(OrderStatusEnum), default=OrderStatusEnum.pending)
+    total_amount = Column(DECIMAL(10, 2))
+
+    order_items = relationship("OrderItem", back_populates="order")
+    user_profile = relationship("UserProfile", back_populates="order")
+    payments = relationship("Payment", back_populates="order")
