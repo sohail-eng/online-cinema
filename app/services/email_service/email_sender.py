@@ -1,7 +1,8 @@
 import secrets
 
 from mailjet_rest import Client
-from settings import settings
+
+from app.core.settings import settings
 
 api_key = settings.MAILJET_API_KEY
 api_secret = settings.MAILJET_API_SECRET_KEY
