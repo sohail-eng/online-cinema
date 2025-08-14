@@ -4,10 +4,12 @@ from fastapi import FastAPI
 from starlette import status
 from starlette.responses import JSONResponse
 
-from database import engine
-from exceptions import UserDontHavePermissionError, MovieNotFoundError, SomethingWentWrongError, CommentNotFoundError
-from models import Base
-from routers import users, movies, auth
+from app import api
+from app.api.v1 import endpoints
+from app.api.v1.endpoints import auth, cart, movie, order, payment
+from app.db.database import Base, engine
+from app.utils.exceptions import CommentNotFoundError, SomethingWentWrongError, MovieNotFoundError, \
+    UserDontHavePermissionError
 
 
 @asynccontextmanager
@@ -54,6 +56,9 @@ async def handler_exception(request, exception):
         status_code=status.HTTP_400_BAD_REQUEST
     )
 
-app.include_router(auth.router)
-app.include_router(users.router)
-app.include_router(movies.router)
+app.include_router(api.v1.endpoints.auth.router)
+app.include_router(api.v1.endpoints.cart.router)
+app.include_router(endpoints.movie.router)
+app.include_router(api.v1.endpoints.order.router)
+app.include_router(api.v1.endpoints.payment.router)
+
