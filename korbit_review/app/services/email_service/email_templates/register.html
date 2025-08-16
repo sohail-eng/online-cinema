@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Account Activation</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f7f7f7; padding: 30px;">
+<div style="max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px;">
+  <h2>📧 Confirm Your Registration</h2>
+  <p>Hello, {{ user_email }}!</p>
+  <p>To activate your account, click the button below:</p>
+  <p>
+    <a href="{{ activation_link }}"
+       style="background: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px;">
+      Activate Account
+    </a>
+  </p>
+  <p>This link is valid for a limited time only (24 hours).</p>
+</div>
+</body>
+</html>
